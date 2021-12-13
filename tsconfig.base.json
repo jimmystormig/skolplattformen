@@ -16,6 +16,7 @@
     "paths": {
       "@skolplattformen/api": ["libs/api/lib/index.ts"],
       "@skolplattformen/api-hjarntorget": ["libs/api-hjarntorget/lib/index.ts"],
+      "@skolplattformen/api-arena": ["libs/api-arena/lib/index.ts"],
       "@skolplattformen/api-skolplattformen": [
         "libs/api-skolplattformen/lib/index.ts"
       ],

@@ -4,6 +4,7 @@
     "api-hjarntorget": "libs/api-hjarntorget",
     "api-skolplattformen": "libs/api-skolplattformen",
     "api-vklass": "libs/api-vklass",
+    "api-arena": "libs/api-arena",
     "api": "libs/api",
     "curriculum": "libs/curriculum",
     "hooks": "libs/hooks",
