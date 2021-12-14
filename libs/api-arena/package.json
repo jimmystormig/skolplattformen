@@ -7,7 +7,7 @@
     "dist/**/*"
   ],
   "repository": "git@github.com:kolplattformen/skolplattformen.git",
-  "author": "ÖS <info@skolplattformen.org>",
+  "author": "Jimmy Stormig <jimmy@stormig.com>",
   "license": "Apache-2.0",
   "private": false,
   "scripts": {
@@ -17,5 +17,8 @@
     "prepare": "yarn build",
     "run-dev": "yarn run build && node run",
     "publish-package": "npm publish --access public"
+  },
+  "devDependencies": {
+    "typescript": "~4.3.5"
   }
 }
