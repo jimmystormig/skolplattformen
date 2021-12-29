@@ -50,6 +50,8 @@ The project consists of several apps and libraries inside [a NX](https://nx.dev/
 ### Apps
 /apps/ contains the application projects. This is the main entry point for a runnable application.
 
+/apps/ contains the application projects. This is the main entry point for a runnable application.
+
 #### skolplattformen
 
 The central part of the project is the app itself. It is written in [TypeScript](https://www.typescriptlang.org/) using [React Native](https://reactnative.dev/) and [React Native Kitten](https://akveo.github.io/react-native-ui-kitten/).
@@ -67,6 +69,8 @@ The code for the website at https://skolplattformen.org/. It's built using Next.
 For more information, check out the [source code](apps/website).
 ### Libs
 
+### Libs
+
 /libs/ contains the library projects. There are many different kinds of libraries, and each library defines its own external API so that boundaries between libraries remain clear.
 
 #### api
@@ -80,6 +84,10 @@ The implementation for the school platform in Gothenburg called Hjärntorget.
 #### api-vklass
 
 The implementation for the school platform Vklass.
+
+#### api-arena
+
+The implementation for the school platform in Alingsås called Arena
 
 #### api-skolplattformen
 
@@ -104,11 +112,13 @@ Check out the documentation [here](libs/hooks).
 To clone and build the project, you first need to install [git](https://git-scm.com/), [node](https://nodejs.org/en/) and [yarn](https://classic.yarnpkg.com/lang/en/docs/install/).
 
 Clone the repo with
+
 ```bash
 $ git clone https://github.com/kolplattformen/skolplattformen.git
 ```
 
 Install dependencies
+
 ```bash
 cd skolplattformen && yarn
 ```
@@ -117,11 +127,12 @@ cd skolplattformen && yarn
 
 If you wanna run the iOS app, you need to setup a couple of things first, we have a guide that will assist you in getting started with the iOS app. A Mac is required to build projects with native code for iOS so we do not have support for Linux / Windows.
 
-* [Mac OS](/docs/ios_mac.md)
+- [Mac OS](/docs/ios_mac.md)
 
 If you already setup everything, you just need to run the following command in the project root:
 
 Start the iOS app
+
 ```
 yarn run ios
 ```
@@ -130,9 +141,9 @@ yarn run ios
 
 If you wanna run the Android app, you need to setup a couple of things first, we have created three different guides depending on your operating system.
 
-* [Mac OS](/docs/android_mac.md)
-* [Windows](/docs/android_windows.md)
-* [Linux](/docs/android_linux.md)
+- [Mac OS](/docs/android_mac.md)
+- [Windows](/docs/android_windows.md)
+- [Linux](/docs/android_linux.md)
 
 If you already setup everything, you just need to run the following command in the project root:
 
@@ -147,11 +158,13 @@ Documentation coming soon.
 ### Tests
 
 Run all tests
+
 ```
 yarn run test
 ```
 
 Run a specific test
+
 ```
 yarn run test:api-skolplattformen
 ```

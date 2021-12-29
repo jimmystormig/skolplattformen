@@ -13,7 +13,8 @@ export const settingsState = proxy({
     cachedPersonalIdentityNumber: '',
     currentSchoolPlatform: 'stockholm-skolplattformen' as
       | 'stockholm-skolplattformen'
-      | 'goteborg-hjarntorget',
+      | 'goteborg-hjarntorget'
+      | 'alingsas-arena',
     childPersonalIdentityNumber: {} as ChildPersonalNumbers,
   },
 })

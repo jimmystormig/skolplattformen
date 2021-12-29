@@ -5,6 +5,9 @@ export const schoolContacts = (child: Child): SchoolContact[] => schoolContactDa
 
 const [child1,child2] = children()
 
+const schoolContactData = new Map<string, SchoolContact[]>();
+
+/*
 const schoolContactData = new Map<string, SchoolContact[]>([
   [
     child1.id, [
@@ -45,3 +48,4 @@ const schoolContactData = new Map<string, SchoolContact[]>([
     }
 ]]
 ])
+*/

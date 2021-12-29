@@ -5,6 +5,9 @@ export const teachers = (child: Child): Teacher[] => teacherData.get(child.id) ?
 
 const [child1,child2] = children()
 
+const teacherData = new Map<string, Teacher[]>();
+
+/*
 const teacherData = new Map<string, Teacher[]>([
   [
     child1.id, [
@@ -79,3 +82,4 @@ const teacherData = new Map<string, Teacher[]>([
     },
 ]],
 ])
+*/

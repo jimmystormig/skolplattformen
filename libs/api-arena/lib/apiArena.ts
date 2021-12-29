@@ -1,14 +1,17 @@
 import {
-    Api, CalendarItem, Classmate, CookieManager, EtjanstChild, Fetch, Fetcher, FetcherOptions, LoginStatusChecker, MenuItem, NewsItem, Notification, ScheduleItem, SchoolContact, Skola24Child, Teacher, TimetableEntry, User, wrap
+    Api, AuthTicket, CalendarItem, Classmate, CookieManager, EtjanstChild, Fetch, Fetcher, FetcherOptions, LoginStatusChecker, MenuItem, NewsItem, Notification, ScheduleItem, SchoolContact, Skola24Child, Teacher, TimetableEntry, User, wrap
   } from '@skolplattformen/api'
 
 import EventEmitter from "events";
 import { DateTime } from 'luxon';
-
+import { checkStatus, DummyStatusChecker } from './loginStatus'
+import { scrapeUser } from './parse/user';
+import * as routes from './routes'
 export class ApiArena extends EventEmitter implements Api {
   private fetch: Fetcher
   private realFetcher: Fetcher
   private cookieManager: CookieManager
+  private personalNumber?: string
   isFake = false;
   isLoggedIn = false;
 
@@ -23,58 +26,187 @@ export class ApiArena extends EventEmitter implements Api {
     this.cookieManager = cookieManager
   }
 
+  public replaceFetcher(fetcher: Fetcher) {
+    this.fetch = fetcher
+  }
+
   getPersonalNumber(): string | undefined {
-    throw new Error('Method not implemented.');
+    return this.personalNumber
   }
-  login(personalNumber?: string): Promise<LoginStatusChecker> {
-    throw new Error('Method not implemented.');
+
+  public async login(personalNumber?: string): Promise<LoginStatusChecker> {
+    if (personalNumber !== undefined && personalNumber.endsWith('1212121212'))
+      return this.fakeMode()
+
+    this.isFake = false
+
+    console.log('initiating login to Arena')
+
+    // TODO Get https://arena.alingsas.se and check if not redirected -> already logged in
+    const arenaResponse = await this.fetch('arena', routes.arena);
+
+    const arenaResponseUrl = (arenaResponse as any).url as string;
+
+    if (arenaResponseUrl.startsWith(routes.arena)) {
+        // already logged in!
+        const emitter = new DummyStatusChecker()
+        setTimeout(() => {
+          this.isLoggedIn = true
+          emitter.emit('OK')
+          this.emit('login')
+        }, 50)
+        return emitter as LoginStatusChecker;
+    }
+
+    // Was redirected to something like https://idp1.alingsas.se/wa/auth?authmech=Inloggning
+
+    const arenaRedirectBaseUrl = routes.getBaseUrl(arenaResponseUrl);
+    const loginBankIDLandingPageResponse = await this.fetch('loginpage', routes.loginBankIDLandingPage(arenaRedirectBaseUrl))
+
+    // Was redirected to something like https://mNN-mg-local.idp.funktionstjanster.se/samlv2/idp/sign_in/337
+
+    const bankIDBaseUrl = routes.getBaseUrl((loginBankIDLandingPageResponse as any).url);
+
+    // Login with BankID on another device
+    const bankIdAuthUrl = routes.bankIdAuthUrl(bankIDBaseUrl)
+    const ticketResponse = await this.fetch('auth-ticket', bankIdAuthUrl, {
+      redirect: 'follow',
+      method: 'POST',
+      body: "ssn=" + personalNumber,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+
+    if (!ticketResponse.ok) {
+      throw new Error(
+        `Server Error [${ticketResponse.status}] [${ticketResponse.statusText}] [${bankIdAuthUrl}]`
+      )
+    }
+
+    const status = checkStatus(this.fetch, bankIDBaseUrl)
+    status.on('OK', async () => {
+      this.isLoggedIn = true
+      this.personalNumber = personalNumber
+      this.emit('login')
+    })
+    status.on('ERROR', () => {
+      this.personalNumber = undefined
+    })
+
+    return status
   }
-  setSessionCookie(sessionCookie: string): Promise<void> {
-    throw new Error('Method not implemented.');
+
+  async setSessionCookie(sessionCookie: string): Promise<void> {
+    this.cookieManager.setCookieString(sessionCookie, routes.arena)
+    
+    /*
+    const user = await this.getUser()
+    if (!user.isAuthenticated) {
+      throw new Error('Session cookie is expired')
+    }
+    */
+
+    this.isLoggedIn = true
+    this.emit('login')
   }
-  getSessionHeaders(url: string): Promise<{ [index: string]: string; }> {
-    throw new Error('Method not implemented.');
+
+  async getSessionHeaders(url: string): Promise<{ [index: string]: string; }> {
+    const cookie = await this.cookieManager.getCookieString(url)
+    return {
+        cookie,
+    }
   }
-  getUser(): Promise<User> {
-    throw new Error('Method not implemented.');
+
+  async getUser(): Promise<User> {
+    let userPageResponse = await this.fetch('current-user', routes.currentUser);
+    console.log('userPageResponse url 1', (userPageResponse as any).url);
+
+    if (userPageResponse.status !== 200) {
+      return { isAuthenticated: false }
+    }
+
+    if((userPageResponse as any).url !== routes.currentUser) {
+      // TODO This is ugly, save the session cookie name SSESSxxx on login insted
+      // Try again, cookie named SSES was probably missing
+      userPageResponse = await this.fetch('current-user', routes.currentUser);
+      console.log('userPageResponse url 2', (userPageResponse as any).url);
+      if((userPageResponse as any).url !== routes.currentUser) {
+        // Give up
+        return { isAuthenticated: false }
+      }
+    }
+
+    var body = await userPageResponse.text();
+    const user = scrapeUser(body);
+    return user;
   }
-  getChildren(): Promise<EtjanstChild[]> {
-    throw new Error('Method not implemented.');
+
+  async getChildren(): Promise<EtjanstChild[]> {
+    return [];
   }
-  getCalendar(child: EtjanstChild): Promise<CalendarItem[]> {
-    throw new Error('Method not implemented.');
+
+  async getCalendar(child: EtjanstChild): Promise<CalendarItem[]> {
+    return [];
   }
-  getClassmates(child: EtjanstChild): Promise<Classmate[]> {
-    throw new Error('Method not implemented.');
+
+  async getClassmates(child: EtjanstChild): Promise<Classmate[]> {
+    return [];
   }
-  getNews(child: EtjanstChild): Promise<NewsItem[]> {
-    throw new Error('Method not implemented.');
+
+  async getNews(child: EtjanstChild): Promise<NewsItem[]> {
+    return [];
   }
-  getNewsDetails(child: EtjanstChild, item: NewsItem): Promise<any> {
-    throw new Error('Method not implemented.');
+
+  async getNewsDetails(child: EtjanstChild, item: NewsItem): Promise<any> {
+    return {};
   }
-  getMenu(child: EtjanstChild): Promise<MenuItem[]> {
-    throw new Error('Method not implemented.');
+
+  async getMenu(child: EtjanstChild): Promise<MenuItem[]> {
+    return [];
   }
-  getNotifications(child: EtjanstChild): Promise<Notification[]> {
-    throw new Error('Method not implemented.');
+
+  async getNotifications(child: EtjanstChild): Promise<Notification[]> {
+    return [];
   }
-  getTeachers(child: EtjanstChild): Promise<Teacher[]> {
-    throw new Error('Method not implemented.');
+
+  async getTeachers(child: EtjanstChild): Promise<Teacher[]> {
+    return [];
   }
-  getSchedule(child: EtjanstChild, from: DateTime, to: DateTime): Promise<ScheduleItem[]> {
-    throw new Error('Method not implemented.');
+
+  async getSchedule(child: EtjanstChild, from: DateTime, to: DateTime): Promise<ScheduleItem[]> {
+    return [];
   }
-  getSchoolContacts(child: EtjanstChild): Promise<SchoolContact[]> {
-    throw new Error('Method not implemented.');
+
+  async getSchoolContacts(child: EtjanstChild): Promise<SchoolContact[]> {
+    return [];
   }
-  getSkola24Children(): Promise<Skola24Child[]> {
-    throw new Error('Method not implemented.');
+
+  async getSkola24Children(): Promise<Skola24Child[]> {
+    return [];
   }
-  getTimetable(child: Skola24Child, week: number, year: number, lang: string): Promise<TimetableEntry[]> {
-    throw new Error('Method not implemented.');
+
+  async getTimetable(child: Skola24Child, week: number, year: number, lang: string): Promise<TimetableEntry[]> {
+    return [];
   }
-  logout(): Promise<void> {
-    throw new Error('Method not implemented.');
+
+  async logout(): Promise<void> {
+    this.isLoggedIn = false
+    this.personalNumber = undefined
+    this.cookieManager.clearAll()
+    this.emit('logout')
+  }
+
+  private async fakeMode(): Promise<LoginStatusChecker> {
+    this.isFake = true
+
+    setTimeout(() => {
+      this.isLoggedIn = true
+      this.emit('login')
+    }, 50)
+
+    const emitter = new DummyStatusChecker()
+    emitter.token = 'fake'
+    return emitter
   }
 }

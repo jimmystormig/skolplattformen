@@ -14,12 +14,26 @@ const path = require('path')
 const fs = require('fs')
 const HttpProxyAgent = require('https-proxy-agent')
 const agentWrapper = require('./app/agentFetchWrapper')
-const initSkolplattformen = require('@skolplattformen/api-skolplattformen').default
+const initSkolplattformen =
+  require('@skolplattformen/api-skolplattformen').default
 const initHjarntorget = require('@skolplattformen/api-hjarntorget').default
+const initArena = require('@skolplattformen/api-arena').default
 
 const [, , personalNumber, platform] = process.argv
-const isHjarntorget = platform && platform.startsWith('hj')
-const init = isHjarntorget ? initHjarntorget : initSkolplattformen;
+let init, cookieUrl, sessionCookieKey
+if (platform && platform.startsWith('hj')) {
+  init = initHjarntorget
+  cookieUrl = 'https://hjarntorget.goteborg.se'
+  sessionCookieKey = 'JSESSIONID'
+} else if (platform && platform.startsWith('arena')) {
+  init = initArena
+  cookieUrl = 'https://arena.alingsas.se'
+  sessionCookieKey = '_shibsession_*'
+} else {
+  init = initSkolplattformen
+  cookieUrl = 'https://etjanst.stockholm.se'
+  sessionCookieKey = 'SMSESSION'
+}
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 const cookieJar = new CookieJar()
@@ -40,6 +54,7 @@ async function run() {
 
       if (bankIdUsed) {
         const sessionCookie = getSessionCookieFromCookieJar()
+        console.log('sessionCookie', sessionCookie)
         ensureDirectoryExistence(recordFolder)
         await writeFile(
           `${recordFolder}/latestSessionCookie.txt`,
@@ -49,13 +64,16 @@ async function run() {
           `Session cookie saved to file ${recordFolder}/latesSessionCookie.txt`
         )
       }
+
       console.log('user') //-
       const user = await api.getUser()
       console.log(user)
 
+      /*
       console.log('children')
       const children = await api.getChildren()
       console.log(children)
+      */
       /*
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
@@ -140,14 +158,16 @@ async function Login(api) {
   try {
     console.log('Attempt to use saved session cookie to login')
     const rawContent = await readFile(`${recordFolder}/latestSessionCookie.txt`)
-    const sessionCookies = JSON.parse(rawContent)
-    await api.setSessionCookie(`${sessionCookies[0].key}=${sessionCookies[0].value}`)
-    
+    const sessionCookie = JSON.parse(rawContent)
+    await api.setSessionCookie(`${sessionCookie.key}=${sessionCookie.value}`)
+
     useBankId = false
     console.log('Login with old cookie succeeded')
   } catch (error) {
-    console.log('Could not login with old session cookie. Reverting to BankId')
-    // console.error(error)
+    console.log(
+      'Could not login with old session cookie. Reverting to BankId',
+      error
+    )
   }
 
   if (useBankId) {
@@ -180,12 +200,14 @@ function ensureDirectoryExistence(filePath) {
   fs.mkdirSync(dirname)
 }
 
-
 function getSessionCookieFromCookieJar() {
-  const cookieUrl = isHjarntorget ? 'https://hjarntorget.goteborg.se' : 'https://etjanst.stockholm.se'
   const cookies = cookieJar.getCookiesSync(cookieUrl)
-  const sessionCookieKey =  isHjarntorget  ? 'JSESSIONID' : 'SMSESSION'
-  return cookies.find(c => c.key === sessionCookieKey)
+  console.log('getSessionCookieFromCookieJar', cookies)
+  return cookies.find((c) =>
+    sessionCookieKey.endsWith('*')
+      ? c.key.startsWith(sessionCookieKey.slice(0, 1))
+      : c.key === sessionCookieKey
+  )
 }
 
 const record = async (info, data) => {
