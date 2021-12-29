@@ -99,13 +99,11 @@ export class ApiArena extends EventEmitter implements Api {
 
   async setSessionCookie(sessionCookie: string): Promise<void> {
     this.cookieManager.setCookieString(sessionCookie, routes.arena)
-    
-    /*
+
     const user = await this.getUser()
     if (!user.isAuthenticated) {
       throw new Error('Session cookie is expired')
     }
-    */
 
     this.isLoggedIn = true
     this.emit('login')
