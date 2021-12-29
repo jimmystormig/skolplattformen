@@ -21,33 +21,34 @@ The respective README files there contain more detailed descriptions.
 
 ## Contents
 
-* [Architecture](#architecture)
-  * [Apps](#apps)
-    * [skolplattformen](#skolplattformen)
-    * [website](#website)
-  * [Libs](#embedded-api)
-    * [api](#api)
-    * [api-skolplattformen](#api-skolplattformen)
-    * [api-hjarntorget](#api-hjarntorget)
-    * [api-vklass](#api-vklass)
-    * [curriculum](#curriculum)
-    * [hooks](#hooks)
-* [Getting started with development](#getting-started-with-development)
-    * [iOS](#ios)
-    * [Android](#android)
-    * [Website](#website)
-    * [Tests](#tests)
-* [Contributions](#contributions)
-* [Money](#money)
-* [Disclaimer](#disclaimer)
-* [Contributors](#contributors)
-* [License](#license)
+- [Architecture](#architecture)
+  - [Apps](#apps)
+    - [skolplattformen](#skolplattformen)
+    - [website](#website)
+  - [Libs](#embedded-api)
+    - [api](#api)
+    - [api-skolplattformen](#api-skolplattformen)
+    - [api-hjarntorget](#api-hjarntorget)
+    - [api-vklass](#api-vklass)
+    - [curriculum](#curriculum)
+    - [hooks](#hooks)
+- [Getting started with development](#getting-started-with-development)
+  - [iOS](#ios)
+  - [Android](#android)
+  - [Website](#website)
+  - [Tests](#tests)
+- [Contributions](#contributions)
+- [Money](#money)
+- [Disclaimer](#disclaimer)
+- [Contributors](#contributors)
+- [License](#license)
 
 ## Architecture
 
 The project consists of several apps and libraries inside [a NX](https://nx.dev/) monorepo.
 
 ### Apps
+
 /apps/ contains the application projects. This is the main entry point for a runnable application.
 
 /apps/ contains the application projects. This is the main entry point for a runnable application.
@@ -67,7 +68,6 @@ For more information, check out the [source code](apps/skolplattformen-app).
 The code for the website at https://skolplattformen.org/. It's built using Next.js.
 
 For more information, check out the [source code](apps/website).
-### Libs
 
 ### Libs
 
