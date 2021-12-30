@@ -70,15 +70,14 @@ export class ApiArena extends EventEmitter implements Api {
     const bankIDBaseUrl = routes.getBaseUrl((loginBankIDLandingPageResponse as any).url);
 
     // Login with BankID on another device
-    const bankIdAuthUrl = routes.bankIdAuthUrl(bankIDBaseUrl)
-    const ticketResponse = await this.fetch('auth-ticket', bankIdAuthUrl, {
+    const ticketResponse = await this.fetch('auth-ticket-other', routes.bankIdOtherDeviceAuthUrl(bankIDBaseUrl), {
       redirect: 'follow',
       method: 'POST',
       body: "ssn=" + personalNumber,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-    })
+    });
 
     if (!ticketResponse.ok) {
       throw new Error(

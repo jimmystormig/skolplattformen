@@ -8,7 +8,7 @@ export const authLoginUrl = 'https://idp1.alingsas.se/wa/auth/saml/'
 
 export const samlLoginUrl = 'https://arena.alingsas.se/Shibboleth.sso/SAML2/POST'
 
-export const bankIdAuthUrl = (bankIdBaseUrl: string) => bankIdBaseUrl + "/mg-local/auth/ccp11/grp/other/ssn";
+export const bankIdOtherDeviceAuthUrl = (bankIdBaseUrl: string) => bankIdBaseUrl + "/mg-local/auth/ccp11/grp/other/ssn";
 
 export const pollStatusUrl = (basePollUrl: string) => basePollUrl + "/mg-local/auth/ccp11/grp/pollstatus";
 
