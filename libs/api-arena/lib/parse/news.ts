@@ -16,7 +16,7 @@ export function scrapeNews(body: string, child: EtjanstChild): NewsItem[] {
 
     linksOfLinks.forEach(links => {
         links.forEach(link => {
-            const viewed = link.classNames.indexOf('node-viewed') > -1 ? '◉ ' : '◎ ';
+            const viewed = link.classNames.indexOf('node-viewed') > -1 ? '' : '◉ ';
             news.push({
                 id: link.getAttribute('href') as string,
                 header: viewed + link.text,
@@ -46,6 +46,6 @@ export function scrapeNewsDetail(body: string): NewsItem{
         intro: newsBlock.querySelector('.field-name-field-introduction .field-item')?.rawText,
         body: newsBlock.querySelector('.field-name-body .field-item')?.rawText,
         author: newsBlock.querySelector('.submitted .username')?.rawText,
-        published: date.toISODate(),
+        published: date.toISO(),
     };
 }
