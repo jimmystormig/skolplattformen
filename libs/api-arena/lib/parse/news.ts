@@ -1,6 +1,7 @@
 import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { EtjanstChild, NewsItem } from '@skolplattformen/api'
+import { DateTime } from "luxon"
 
 export function scrapeNews(body: string, child: EtjanstChild): NewsItem[] {
     const doc = html.parse(decode(body));
@@ -15,9 +16,10 @@ export function scrapeNews(body: string, child: EtjanstChild): NewsItem[] {
 
     linksOfLinks.forEach(links => {
         links.forEach(link => {
+            const viewed = link.classNames.indexOf('node-viewed') > -1 ? '◉ ' : '◎ ';
             news.push({
                 id: link.getAttribute('href') as string,
-                header: link.text,
+                header: viewed + link.text,
                 published: ''
             })
         });
@@ -34,12 +36,16 @@ export function scrapeNewsDetail(body: string): NewsItem{
 
     // TODO Add attached files to body
 
+    // Date is in format '21 dec 2021'
+    var rawDate = newsBlock.querySelector('.submitted .date-display-single')?.rawText;
+    var date = DateTime.fromFormat(rawDate, 'dd MMM yyyy', { locale: 'sv' });
+
     return {
         id: '',
         header: newsBlock.querySelector('h1 span')?.rawText,
         intro: newsBlock.querySelector('.field-name-field-introduction .field-item')?.rawText,
         body: newsBlock.querySelector('.field-name-body .field-item')?.rawText,
         author: newsBlock.querySelector('.submitted .username')?.rawText,
-        published: newsBlock.querySelector('.submitted .date-display-single')?.rawText,
+        published: date.toISODate(),
     };
 }
