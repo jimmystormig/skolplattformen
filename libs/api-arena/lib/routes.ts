@@ -1,5 +1,7 @@
 export const arena = "https://arena.alingsas.se";
 
+export const arenaNews = (newsPath: string) => `${arena}${newsPath}`;
+
 export const loginBankIDLandingPage = (baseUrl:string) => baseUrl + "/wa/auth?authmech=tc6wyb5ukmps";
 
 export const authLoginUrl = 'https://idp1.alingsas.se/wa/auth/saml/'

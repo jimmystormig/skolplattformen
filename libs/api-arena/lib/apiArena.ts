@@ -5,6 +5,8 @@ import {
 import EventEmitter from "events";
 import { DateTime } from 'luxon';
 import { checkStatus, DummyStatusChecker } from './loginStatus'
+import { scrapeChildren } from './parse/children';
+import { scrapeNews, scrapeNewsDetail } from './parse/news';
 import { scrapeUser } from './parse/user';
 import * as routes from './routes'
 export class ApiArena extends EventEmitter implements Api {
@@ -118,8 +120,6 @@ export class ApiArena extends EventEmitter implements Api {
 
   async getUser(): Promise<User> {
     let userPageResponse = await this.fetch('current-user', routes.currentUser);
-    console.log('userPageResponse url 1', (userPageResponse as any).url);
-
     if (userPageResponse.status !== 200) {
       return { isAuthenticated: false }
     }
@@ -128,20 +128,27 @@ export class ApiArena extends EventEmitter implements Api {
       // TODO This is ugly, save the session cookie name SSESSxxx on login insted
       // Try again, cookie named SSES was probably missing
       userPageResponse = await this.fetch('current-user', routes.currentUser);
-      console.log('userPageResponse url 2', (userPageResponse as any).url);
-      if((userPageResponse as any).url !== routes.currentUser) {
+      if(userPageResponse.status !== 200 || (userPageResponse as any).url !== routes.currentUser) {
         // Give up
         return { isAuthenticated: false }
       }
     }
 
     var body = await userPageResponse.text();
-    const user = scrapeUser(body);
-    return user;
+    return scrapeUser(body);
   }
 
   async getChildren(): Promise<EtjanstChild[]> {
-    return [];
+    let response = await this.fetch('current-user', routes.arena);
+
+    if (!response.ok) {
+      throw new Error(
+        `Server Error [${response.status}] [${response.statusText}] [${routes.arena}]`
+      )
+    }
+
+    const body = await response.text();
+    return await scrapeChildren(body);
   }
 
   async getCalendar(child: EtjanstChild): Promise<CalendarItem[]> {
@@ -153,11 +160,29 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
-    return [];
+    let response = await this.fetch('current-user', routes.arena);
+
+    if (!response.ok) {
+      throw new Error(
+        `Server Error [${response.status}] [${response.statusText}] [${routes.arena}]`
+      )
+    }
+
+    const body = await response.text();
+    return await scrapeNews(body, child);
   }
 
   async getNewsDetails(child: EtjanstChild, item: NewsItem): Promise<any> {
-    return {};
+    let response = await this.fetch('current-user', routes.arenaNews(item.id));
+
+    if (!response.ok) {
+      throw new Error(
+        `Server Error [${response.status}] [${response.statusText}] [${routes.arena}]`
+      )
+    }
+
+    const body = await response.text();
+    return await scrapeNewsDetail(body);
   }
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {

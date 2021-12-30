@@ -69,11 +69,10 @@ async function run() {
       const user = await api.getUser()
       console.log(user)
 
-      /*
       console.log('children')
       const children = await api.getChildren()
       console.log(children)
-      */
+
       /*
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
@@ -116,19 +115,22 @@ async function run() {
         console.error(error)
       }
 
-      /*
+      */
       console.log('news')
       const news = await api.getNews(children[0])
-*/
-      /* console.log('news details')
+      console.log(news)
+
+      console.log('news details')
       const newsItems = await Promise.all(
         news.map((newsItem) =>
-          api.getNewsDetails(children[0], newsItem)
-            .catch((err) => { console.error(newsItem.id, err) })
+          api.getNewsDetails(children[0], newsItem).catch((err) => {
+            console.error(newsItem.id, err)
+          })
         )
       )
-      console.log(newsItems) */
+      console.log(newsItems)
 
+      /* 
       /* console.log('menu')
       const menu = await api.getMenu(children[0])
       console.log(menu) */
@@ -202,7 +204,6 @@ function ensureDirectoryExistence(filePath) {
 
 function getSessionCookieFromCookieJar() {
   const cookies = cookieJar.getCookiesSync(cookieUrl)
-  console.log('getSessionCookieFromCookieJar', cookies)
   return cookies.find((c) =>
     sessionCookieKey.endsWith('*')
       ? c.key.startsWith(sessionCookieKey.slice(0, 1))
