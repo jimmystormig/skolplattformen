@@ -14,6 +14,12 @@ export const pollStatusUrl = (basePollUrl: string) => basePollUrl + "/mg-local/a
 
 export const currentUser = 'https://arena.alingsas.se/user';
 
+export const skola24 = 'https://idp.alingsas.se/skolfed/skola24';
+
+export const skola24Absence = 'https://web.skola24.se/api/get/schools/for/absence';
+
+export const skola24Students = 'https://web.skola24.se/api/get/students/for/logged/in/person';
+
 export const getBaseUrl = (url: string) => {
   var path = url.split( '/' );
   return path[0] + '//' + path[2];

@@ -1,5 +1,5 @@
 import {
-    Api, AuthTicket, CalendarItem, Classmate, CookieManager, EtjanstChild, Fetch, Fetcher, FetcherOptions, LoginStatusChecker, MenuItem, NewsItem, Notification, ScheduleItem, SchoolContact, Skola24Child, Teacher, TimetableEntry, User, wrap
+    Api, AuthTicket, CalendarItem, Classmate, CookieManager, EtjanstChild, Fetch, Fetcher, FetcherOptions, LoginStatusChecker, MenuItem, NewsItem, Notification, ScheduleItem, SchoolContact, Skola24Child, Teacher, TimetableEntry, User, wrap, SSOSystem
   } from '@skolplattformen/api'
 
 import EventEmitter from "events";
@@ -7,13 +7,21 @@ import { DateTime } from 'luxon';
 import { checkStatus, DummyStatusChecker } from './loginStatus'
 import { scrapeChildren } from './parse/children';
 import { scrapeNews, scrapeNewsDetail } from './parse/news';
+import { extractAlingsasSamlAuthRequestForm, extractAlingsasSamlAuthResponseForm, extractSkola24FrameSource, extractSkola24LoginNovaSsoUrl } from './parse/parsers';
+import { parseSchools, parseChildren } from './parse/skola24';
 import { scrapeUser } from './parse/user';
 import * as routes from './routes'
+
+interface SSOSystems {
+  [name: string]: boolean | undefined
+}
+
 export class ApiArena extends EventEmitter implements Api {
   private fetch: Fetcher
   private realFetcher: Fetcher
   private cookieManager: CookieManager
   private personalNumber?: string
+  private authorizedSystems: SSOSystems = {}
   isFake = false;
   isLoggedIn = false;
 
@@ -70,7 +78,8 @@ export class ApiArena extends EventEmitter implements Api {
     const bankIDBaseUrl = routes.getBaseUrl((loginBankIDLandingPageResponse as any).url);
 
     // Login with BankID on another device
-    const ticketResponse = await this.fetch('auth-ticket-other', routes.bankIdOtherDeviceAuthUrl(bankIDBaseUrl), {
+    const bankIdAuthUrl = routes.bankIdOtherDeviceAuthUrl(bankIDBaseUrl);
+    const ticketResponse = await this.fetch('auth-ticket-other', bankIdAuthUrl, {
       redirect: 'follow',
       method: 'POST',
       body: "ssn=" + personalNumber,
@@ -205,10 +214,95 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getSkola24Children(): Promise<Skola24Child[]> {
-    return [];
+    const skola24Response = await this.fetch('skola24', routes.skola24);
+    const skola24ResponseText = await skola24Response.text();
+    const ssoLoginUrl = await extractSkola24FrameSource(skola24ResponseText);
+    const skola24LoginResponse = await this.fetch('skola24-login', (skola24Response as any).url + ssoLoginUrl);
+    const skola24LoginResponseText = await skola24LoginResponse.text();
+    const skola24LoginNovaSsoUrl = extractSkola24LoginNovaSsoUrl(skola24LoginResponseText)
+    const skola24LoginNovaSsoResponse = await this.fetch('skola24-login-nova-sso', skola24LoginNovaSsoUrl as string);
+    const skola24LoginNovaSsoResponseText = await skola24LoginNovaSsoResponse.text();
+    const alingsasSamlAuthForm = extractAlingsasSamlAuthRequestForm(skola24LoginNovaSsoResponseText);
+    const alingsasSamlAuthRequestResponse = await this.fetch('alingsas-saml-auth', alingsasSamlAuthForm.action, {
+      redirect: 'follow',
+      method: 'POST',
+      body: "SAMLRequest=" + encodeURIComponent(alingsasSamlAuthForm.samlRequest),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': 'https://service-sso1.novasoftware.se/',
+        'Connection': 'keep-alive'
+      },
+    });
+    const alingsasSamlAuthRequestResponseText = await alingsasSamlAuthRequestResponse.text();
+    const alingsasSamlAuthResponseForm = extractAlingsasSamlAuthResponseForm(alingsasSamlAuthRequestResponseText)
+    const noveSsoSamlResponseResponse = await this.fetch('nova-saml-auth', alingsasSamlAuthResponseForm.action, {
+      redirect: 'follow',
+      method: 'POST',
+      body: `SAMLResponse=${encodeURIComponent(alingsasSamlAuthResponseForm.samlResponse)}&RelayState=${encodeURIComponent(alingsasSamlAuthResponseForm.relayState)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': 'https://idp2.alingsas.se/',
+        'Connection': 'keep-alive'
+      },
+    });
+
+    // TODO Check noveSsoSamlResponseResponse
+
+    const absenceResponse = await this.fetch('skola24-roles', routes.skola24Absence, { 
+      body: "null",
+      method: "POST",
+      headers: {
+        "referrer": "https://web.skola24.se/portal/start/overview/dashboard",
+        "referrerPolicy": "strict-origin-when-cross-origin",
+        "mode": "cors",
+        "credentials": "include",
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
+        "cache-control": "no-cache",
+        "content-type": "application/json",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-requested-with": "XMLHttpRequest",
+        "x-scope": "65340ebb-fd0e-411d-976b-d251d76679b7"
+      }
+    });
+    const absence = await absenceResponse.json();
+    const schools = parseSchools(absence);
+
+    const studentsResponse = await this.fetch('skola24-students', routes.skola24Students, {
+      method: 'POST',
+      body: JSON.stringify({ schools: schools.map(school => school.id) }),
+      headers: {
+        "referrer": "https://web.skola24.se/portal/start/overview/dashboard",
+        "referrerPolicy": "strict-origin-when-cross-origin",
+        "mode": "cors",
+        "credentials": "include",
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
+        "cache-control": "no-cache",
+        "content-type": "application/json",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-requested-with": "XMLHttpRequest",
+        "x-scope": "65340ebb-fd0e-411d-976b-d251d76679b7"
+      }
+    });
+    const students = await studentsResponse.json();
+    return parseChildren(students);
   }
 
   async getTimetable(child: Skola24Child, week: number, year: number, lang: string): Promise<TimetableEntry[]> {
+    // Schema
     return [];
   }
 

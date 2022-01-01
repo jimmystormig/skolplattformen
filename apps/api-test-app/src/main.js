@@ -65,6 +65,7 @@ async function run() {
         )
       }
 
+      /*
       console.log('user') //-
       const user = await api.getUser()
       console.log(user)
@@ -73,7 +74,6 @@ async function run() {
       const children = await api.getChildren()
       console.log(children)
 
-      /*
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
       console.log(calendar)
@@ -93,6 +93,7 @@ async function run() {
       } catch (error) {
         console.error(error)
       }
+      */
 
       let skola24children
       try {
@@ -102,6 +103,7 @@ async function run() {
         console.error(error)
       }
 
+      /*
       try {
         console.log('timetable')
         const timetable = await api.getTimetable(
@@ -115,7 +117,6 @@ async function run() {
         console.error(error)
       }
 
-      */
       console.log('news')
       const news = await api.getNews(children[0])
       console.log(news)
@@ -130,7 +131,6 @@ async function run() {
       )
       console.log(newsItems)
 
-      /* 
       /* console.log('menu')
       const menu = await api.getMenu(children[0])
       console.log(menu) */
