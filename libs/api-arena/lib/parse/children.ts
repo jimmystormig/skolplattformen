@@ -2,6 +2,7 @@ import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { EtjanstChild } from '@skolplattformen/api'
 
+/*
 export function scrapeChildren(body: string): EtjanstChild[] {
     const doc = html.parse(decode(body));
 
@@ -15,3 +16,4 @@ export function scrapeChildren(body: string): EtjanstChild[] {
         }
     });
 }
+*/

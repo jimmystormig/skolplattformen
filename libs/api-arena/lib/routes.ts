@@ -16,10 +16,6 @@ export const currentUser = 'https://arena.alingsas.se/user';
 
 export const skola24 = 'https://idp.alingsas.se/skolfed/skola24';
 
-export const skola24Absence = 'https://web.skola24.se/api/get/schools/for/absence';
-
-export const skola24Students = 'https://web.skola24.se/api/get/students/for/logged/in/person';
-
 export const skola24Timetables = 'https://web.skola24.se/api/services/skola24/get/personal/timetables'
 
 export const skola24TimetableKey = 'https://web.skola24.se/api/get/timetable/render/key';
@@ -27,6 +23,8 @@ export const skola24TimetableKey = 'https://web.skola24.se/api/get/timetable/ren
 export const skola24Timetable = 'https://web.skola24.se/api/render/timetable';
 
 export const skola24Host = 'alingsas-sso.skola24.se';
+
+export const skolmaten = (schoolID: string) => `https://skolmaten.se/${schoolID}/`;
 
 export const getBaseUrl = (url: string) => {
   var path = url.split( '/' );

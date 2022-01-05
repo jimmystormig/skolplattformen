@@ -1,6 +1,7 @@
 import { DateTime, FixedOffsetZone } from 'luxon'
 import { Skola24Child, TimetableEntry } from "@skolplattformen/api";
 
+/*
 export const parseSchools = (absenceResponse: any): any[] => {
     return absenceResponse.data.schools.map((school: any) => {
         return {
@@ -19,6 +20,7 @@ export const parseChildren = (studentsResponse: any): Skola24Child[] => {
         }
     });
 }
+*/
 
 export const parseTimetable = (timetableResponse: any, year: number, week: number): TimetableEntry[] => {
     return timetableResponse.data.lessonInfo ?

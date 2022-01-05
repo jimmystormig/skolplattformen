@@ -5,10 +5,11 @@ import {
 import EventEmitter from "events";
 import { DateTime } from 'luxon';
 import { checkStatus, DummyStatusChecker } from './loginStatus'
-import { scrapeChildren } from './parse/children';
+// import { scrapeChildren } from './parse/children';
 import { scrapeNews, scrapeNewsDetail } from './parse/news';
 import { extractAlingsasSamlAuthRequestForm, extractAlingsasSamlAuthResponseForm, extractSkola24FrameSource, extractSkola24LoginNovaSsoUrl } from './parse/parsers';
-import { parseSchools, parseChildren, parseTimetable } from './parse/skola24';
+import { parseTimetable } from './parse/skola24';
+import { scrapeMenus } from './parse/skolmaten';
 import { scrapeUser } from './parse/user';
 import * as routes from './routes'
 
@@ -147,6 +148,7 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getChildren(): Promise<EtjanstChild[]> {
+    /*
     let response = await this.fetch('current-user', routes.arena);
 
     if (!response.ok) {
@@ -157,6 +159,16 @@ export class ApiArena extends EventEmitter implements Api {
 
     const body = await response.text();
     return await scrapeChildren(body);
+    */
+   const skola24Children = await this.getSkola24Children();
+   return skola24Children.map(child => {
+     return {
+       id: child.personGuid as string,
+       name: `${child.firstName} ${child.lastName}`,
+       schoolId: child.schoolID,
+       sdsId: ''
+     }
+   });
   }
 
   async getCalendar(child: EtjanstChild): Promise<CalendarItem[]> {
@@ -181,6 +193,8 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getNewsDetails(child: EtjanstChild, item: NewsItem): Promise<any> {
+    // TODO Make news marked as read
+
     let response = await this.fetch('current-user', routes.arenaNews(item.id));
 
     if (!response.ok) {
@@ -194,7 +208,30 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {
-    return [];
+    let schoolId = child.schoolId as string;
+
+    switch (schoolId) {
+      case 'Stadsskogenskolan':
+        schoolId = 'aktivitetshuset-stadsskogen-skola';
+        break;
+      case 'Noltorpsskolan 1':
+      case 'Noltorpsskolan 2':
+        schoolId = 'noltorpsskolan';
+        break;
+      default:
+        schoolId = schoolId.toLowerCase().replace(/ /g, '-').replace(/å/g, 'a').replace(/ä/g, 'a').replace(/ö/g, 'o');
+        break;
+    }
+
+    const url = routes.skolmaten(schoolId as string);
+    const response = await this.fetch('skolmaten', url);
+
+    if(response.status === 404) {
+      return [];
+    }
+
+    const responseText = await response.text();
+    return scrapeMenus(responseText);
   }
 
   async getNotifications(child: EtjanstChild): Promise<Notification[]> {
@@ -214,126 +251,58 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getSkola24Children(): Promise<Skola24Child[]> {
-    let schools = await this.getSkola24Schools();
-    if(schools.length === 0) {
-      // No schools found, probably not logged in to Skola24 -> Login and try again
-      await this.authenticateWithSkola24();
-      schools = await this.getSkola24Schools();
-    }
-
-    const studentsResponse = await this.fetch('skola24-students', routes.skola24Students, {
-      method: 'POST',
-      body: JSON.stringify({ schools: schools.map(school => school.id) }),
-      headers: {
-        "referrer": "https://web.skola24.se/portal/start/overview/dashboard",
-        "referrerPolicy": "strict-origin-when-cross-origin",
-        "mode": "cors",
-        // "credentials": "include",
-        "accept": "application/json, text/javascript, */*; q=0.01",
-        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        "pragma": "no-cache",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-requested-with": "XMLHttpRequest",
-        "x-scope": "65340ebb-fd0e-411d-976b-d251d76679b7"
-      }
-    });
-    const students = await studentsResponse.json();
-    return parseChildren(students);
+    return await this.getSkola24Timetables();
   }
-
+  
   async getTimetable(child: Skola24Child, week: number, year: number, lang: string): Promise<TimetableEntry[]> {
-    // Schema
-    let childrenTimetables = await this.getSkola24ChildrenTimetables();
-    if(childrenTimetables.length === 0) {
-      // No schools found, probably not logged in to Skola24 -> Login and try again
-      await this.authenticateWithSkola24();
-      childrenTimetables = await this.getSkola24ChildrenTimetables();
+    const childrenTimetables = await this.getSkola24Timetables();
+    const timetableForChild = childrenTimetables.find((timetable: any) => timetable.personGuid === child.personGuid);
+    if(!timetableForChild) {
+      throw new Error(`Could not find timetable for child ${child.firstName} ${child.lastName}`);
     }
-
-    const timetableForUser = childrenTimetables.find((timetable: any) => timetable.firstName === child.firstName && timetable.lastName === child.lastName);
 
     const timetableKeyResponse = await this.fetch('skola24-timetable-key', routes.skola24TimetableKey, {
       method: 'POST',
       body: "null",
       "headers": {
-        "accept": "application/json, text/javascript, */*; q=0.01",
-        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        "pragma": "no-cache",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-requested-with": "XMLHttpRequest",
         "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
-        "mode": "cors",
-        "credentials": "include",
         "referrer": "https://web.skola24.se/portal/start/timetable/timetable-viewer/alingsas-sso.skola24.se/",
-        "referrerPolicy": "strict-origin-when-cross-origin",
+        ...this.skola24CommonHeaders
       },
     });
     const timetableData = await timetableKeyResponse.json();
     const timetableKey = timetableData.data.key;
-    console.log('timetableKeyResponse', timetableKeyResponse);
 
     const timetableResponse = await this.fetch('skola24-timetable', routes.skola24Timetable, {
       method: 'POST',
       body: JSON.stringify({
-        renderKey:timetableKey,
+        renderKey: timetableKey,
         host:routes.skola24Host,
-        unitGuid: timetableForUser.unitGuid,
+        unitGuid: timetableForChild.unitGuid,
         startDate:null,
-        endDate:null,
-        scheduleDay:0,
-        blackAndWhite:false,
-        width:1000,
-        height:550,
-        selectionType:5,
-        selection:timetableForUser.personGuid,
-        showHeader:false,
-        periodText:"",
+        endDate: null,
+        scheduleDay: 0,
+        blackAndWhite: false,
+        width: 1000,
+        height: 550,
+        selectionType: 5,
+        selection: timetableForChild.personGuid,
+        showHeader: false,
+        periodText: "",
         week: week,
         year: year,
-        privateFreeTextMode:null,
-        privateSelectionMode:true,
-        customerKey:""
+        privateFreeTextMode: null,
+        privateSelectionMode: true,
+        customerKey: ""
       }),
       "headers": {
-        "accept": "application/json, text/javascript, */*; q=0.01",
-        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        "pragma": "no-cache",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-requested-with": "XMLHttpRequest",
-        "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
-        "mode": "cors",
-        "credentials": "include",
         "referrer": "https://web.skola24.se/portal/start/timetable/timetable-viewer/alingsas-sso.skola24.se/",
-        "referrerPolicy": "strict-origin-when-cross-origin",
+        "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
+        ...this.skola24CommonHeaders
       },
     });
-    console.log('timetableResponse', timetableResponse);
 
     const timetable = await timetableResponse.json();
-
-    console.log('timetable', timetable);
-
     return parseTimetable(timetable, year, week);
   }
 
@@ -341,6 +310,7 @@ export class ApiArena extends EventEmitter implements Api {
     this.isLoggedIn = false
     this.personalNumber = undefined
     this.cookieManager.clearAll()
+    this.authorizedSystems = {}
     this.emit('logout')
   }
 
@@ -358,6 +328,11 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   private async authenticateWithSkola24(): Promise<void> {
+    const targetSystem = 'Skola24';
+    if (this.authorizedSystems[targetSystem]) {
+      return;
+    }
+
     const skola24Response = await this.fetch('skola24', routes.skola24);
     const skola24ResponseText = await skola24Response.text();
     const ssoLoginUrl = await extractSkola24FrameSource(skola24ResponseText);
@@ -391,64 +366,44 @@ export class ApiArena extends EventEmitter implements Api {
     });
 
     // TODO Check noveSsoSamlResponseResponse
+
+    this.authorizedSystems[targetSystem] = true
   }
 
-  private async getSkola24Schools(): Promise<any[]> {
-    const absenceResponse = await this.fetch('skola24-roles', routes.skola24Absence, {
-      body: "null",
-      method: "POST",
-      headers: {
-        "referrer": "https://web.skola24.se/portal/start/overview/dashboard",
-        "referrerPolicy": "strict-origin-when-cross-origin",
-        "mode": "cors",
-        //"credentials": "include",
-        "accept": "application/json, text/javascript, */*; q=0.01",
-        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        "pragma": "no-cache",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-requested-with": "XMLHttpRequest",
-        "x-scope": "65340ebb-fd0e-411d-976b-d251d76679b7"
-      }
-    });
-    const absence = await absenceResponse.json();
-    return parseSchools(absence);
+  private async getSkola24Timetables(){
+    const getSkola24ChildrenTimetables = async () => {
+      const timetablesResponse = await this.fetch('skola24-timetables', routes.skola24Timetables, {
+        method: 'POST',
+        body: '{"getPersonalTimetablesRequest":{"hostName":"' + routes.skola24Host + '"}}',
+        "headers": {
+          "referrer": "https://web.skola24.se/portal/start/timetable/timetable-viewer",
+          "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
+          ...this.skola24CommonHeaders
+        },
+      });
+      const timetables = await timetablesResponse.json();
+      const childrenTimetables = timetables.data.getPersonalTimetablesResponse.childrenTimetables;
+      return childrenTimetables ? childrenTimetables : [];
+    }
+
+    let childrenTimetables = await getSkola24ChildrenTimetables();
+    if(childrenTimetables.length === 0) {
+      // No timetables found, probably not logged in to Skola24 -> Login and try again
+      await this.authenticateWithSkola24();
+      childrenTimetables = await getSkola24ChildrenTimetables();
+    }
+    return childrenTimetables;
   }
 
-  private async getSkola24ChildrenTimetables(): Promise<any[]> {
-    const timetablesResponse = await this.fetch('skola24-timetables', routes.skola24Timetables, {
-      method: 'POST',
-      body: '{"getPersonalTimetablesRequest":{"hostName":"' + routes.skola24Host + '"}}',
-      "headers": {
-        "accept": "application/json, text/javascript, */*; q=0.01",
-        "accept-language": "sv,en;q=0.9,en-US;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        "pragma": "no-cache",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"96\", \"Google Chrome\";v=\"96\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-requested-with": "XMLHttpRequest",
-        "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
-        "mode": "cors",
-        "credentials": "include",
-        "referrer": "https://web.skola24.se/portal/start/timetable/timetable-viewer",
-        "referrerPolicy": "strict-origin-when-cross-origin",
-      },
-    });
-    console.log('timetablesResponse', timetablesResponse);
-    const timetables = await timetablesResponse.json();
-    console.log('timetables', timetables);
-    const childrenTimetables = timetables.data.getPersonalTimetablesResponse.childrenTimetables;
-    return childrenTimetables ? childrenTimetables : [];
+  private skola24CommonHeaders = {
+    "accept": "application/json, text/javascript, */*; q=0.01",
+    "accept-language": "sv,en;q=0.9,en-US;q=0.8",
+    "cache-control": "no-cache",
+    "content-type": "application/json",
+    "pragma": "no-cache",
+    "x-requested-with": "XMLHttpRequest",
+    "mode": "cors",
+    "credentials": "include",
+    "referrerPolicy": "strict-origin-when-cross-origin",
   }
 }
