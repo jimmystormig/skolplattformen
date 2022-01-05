@@ -20,6 +20,14 @@ export const skola24Absence = 'https://web.skola24.se/api/get/schools/for/absenc
 
 export const skola24Students = 'https://web.skola24.se/api/get/students/for/logged/in/person';
 
+export const skola24Timetables = 'https://web.skola24.se/api/services/skola24/get/personal/timetables'
+
+export const skola24TimetableKey = 'https://web.skola24.se/api/get/timetable/render/key';
+
+export const skola24Timetable = 'https://web.skola24.se/api/render/timetable';
+
+export const skola24Host = 'alingsas-sso.skola24.se';
+
 export const getBaseUrl = (url: string) => {
   var path = url.split( '/' );
   return path[0] + '//' + path[2];

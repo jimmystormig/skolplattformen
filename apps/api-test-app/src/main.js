@@ -103,13 +103,12 @@ async function run() {
         console.error(error)
       }
 
-      /*
       try {
         console.log('timetable')
         const timetable = await api.getTimetable(
           skola24children[0],
-          15,
-          2021,
+          3,
+          2022,
           'sv'
         )
         console.log(inspect(timetable, false, 1000, true))
@@ -117,6 +116,7 @@ async function run() {
         console.error(error)
       }
 
+      /*
       console.log('news')
       const news = await api.getNews(children[0])
       console.log(news)

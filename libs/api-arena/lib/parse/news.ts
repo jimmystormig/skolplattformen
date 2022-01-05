@@ -29,7 +29,7 @@ export function scrapeNews(body: string, child: EtjanstChild): NewsItem[] {
     return news;
 }
 
-export function scrapeNewsDetail(body: string): NewsItem{
+export function scrapeNewsDetail(body: string, item: NewsItem): NewsItem{
     const doc = html.parse(decode(body));
 
     const newsBlock = doc.querySelector('.node-news');
@@ -41,7 +41,7 @@ export function scrapeNewsDetail(body: string): NewsItem{
     var date = DateTime.fromFormat(rawDate, 'dd MMM yyyy', { locale: 'sv' });
 
     return {
-        id: '',
+        id: item.id,
         header: newsBlock.querySelector('h1 span')?.rawText,
         intro: newsBlock.querySelector('.field-name-field-introduction .field-item')?.rawText,
         body: newsBlock.querySelector('.field-name-body .field-item')?.rawText,
