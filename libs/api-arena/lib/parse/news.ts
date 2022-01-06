@@ -39,13 +39,16 @@ export function scrapeNewsDetail(body: string, item: NewsItem): NewsItem{
     // Date is in format '21 dec 2021'
     var rawDate = newsBlock.querySelector('.submitted .date-display-single')?.rawText;
     var date = DateTime.fromFormat(rawDate, 'dd MMM yyyy', { locale: 'sv' });
+    var imageUrl = newsBlock.querySelector('.field-name-field-image img')?.getAttribute('src');
+    var header = newsBlock.querySelector('h1 span')?.rawText;
 
     return {
         id: item.id,
-        header: newsBlock.querySelector('h1 span')?.rawText,
+        header: header,
         intro: newsBlock.querySelector('.field-name-field-introduction .field-item')?.rawText,
         body: newsBlock.querySelector('.field-name-body .field-item')?.rawText,
         author: newsBlock.querySelector('.submitted .username')?.rawText,
         published: date.toISO(),
+        fullImageUrl: imageUrl,
     };
 }

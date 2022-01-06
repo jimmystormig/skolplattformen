@@ -159,7 +159,6 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getChildren(): Promise<EtjanstChild[]> {
-    console.log('getSkola24Children');
    const skola24Children = await this.getSkola24Children();
    return skola24Children.map(child => {
      return {
@@ -255,13 +254,6 @@ export class ApiArena extends EventEmitter implements Api {
     const unikumStartResponse = await this.fetch('unikum-start', routes.unikumStart);
     const unikumStartResponseUrl = (unikumStartResponse as any).url;
     const unikumBaseUrl = routes.getBaseUrl(unikumStartResponseUrl);
-    
-    /*
-    const unikumResponse = await this.authenticateWithUnikumAndGotoStartpage();
-    const unikumBaseUrl = routes.getBaseUrl((unikumResponse as any).url);
-    const unikumResponseText = await unikumResponse.text();
-    */
-
     const notificationsUrl = routes.unikumNotificationsUrl(unikumStartResponseUrl);
     const notificationsResponse = await this.fetch('notifications', notificationsUrl);
     const notificationsResponseText = await notificationsResponse.text();
@@ -295,7 +287,6 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getSkola24Children(): Promise<Skola24Child[]> {
-    console.log('getSkola24Children');
     return await this.getSkola24Timetables();
   }
   
