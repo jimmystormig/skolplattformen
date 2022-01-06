@@ -81,8 +81,12 @@ async function run() {
       console.log(calendar)
 
       console.log('classmates')
-      const classmates = await api.getClassmates(children[0])
+      const classmates = await api.getClassmates(children[1])
       console.log(classmates)
+
+      console.log('teachers')
+      const teachers = await api.getTeachers(children[1])
+      console.log(teachers)
 
       try {
         console.log('schedule')
@@ -134,15 +138,15 @@ async function run() {
         )
       )
       console.log(newsItems)
-      */
 
       console.log('menu')
       const menu = await api.getMenu(children[0])
       console.log(menu)
+      */
 
-      // console.log('notifications')
-      // const notifications = await api.getNotifications(children[0])
-      // console.log(notifications)
+      console.log('notifications')
+      const notifications = await api.getNotifications(children[0])
+      console.log(notifications)
 
       await api.logout()
     })

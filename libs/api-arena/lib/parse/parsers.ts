@@ -8,11 +8,13 @@ export function extractAuthLoginRequestBody(signatureResponseText: string) {
     const nameAttr = ta.getAttribute("name")
     return nameAttr === 'SAMLResponse'
   })
+  console.log('extractAuthLoginRequestBody -> SAMLResponseElem', SAMLResponseElem);
   const SAMLResponseText = SAMLResponseElem?.rawText
   const RelayStateElem = signatureResponseTextAreas.find(ta => {
     const nameAttr = ta.getAttribute("name")
     return nameAttr === 'RelayState'
   })
+  console.log('extractAuthLoginRequestBody -> RelayStateElem', RelayStateElem);
   const RelayStateText = RelayStateElem?.rawText
   return `SAMLResponse=${encodeURIComponent(SAMLResponseText || '')}&RelayState=${encodeURIComponent(RelayStateText || '')}`
 }
@@ -34,8 +36,10 @@ export function extractSkola24FrameSource(skola24SSOResponseText: string) {
 
 export function extractSkola24LoginNovaSsoUrl(skola24LoginResponseText: string) {
   const doc = html.parse(decode(skola24LoginResponseText));
-  const script = doc.querySelector('script').rawText;
-  const match = script.match(/(?<== ').*(?=';)/);
+  const script = doc.querySelector('script')
+  console.log('extractSkola24LoginNovaSsoUrl -> script', script);
+  const scriptText = script?.rawText;
+  const match = scriptText?.match(/(?<== ').*(?=';)/);
   return match && match[0];
 }
 

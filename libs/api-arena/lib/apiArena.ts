@@ -1,5 +1,5 @@
 import {
-    Api, AuthTicket, CalendarItem, Classmate, CookieManager, EtjanstChild, Fetch, Fetcher, FetcherOptions, LoginStatusChecker, MenuItem, NewsItem, Notification, ScheduleItem, SchoolContact, Skola24Child, Teacher, TimetableEntry, User, wrap, SSOSystem
+    Api, AuthTicket, CalendarItem, Classmate, CookieManager, EtjanstChild, Fetch, Fetcher, FetcherOptions, LoginStatusChecker, MenuItem, NewsItem, Notification, ScheduleItem, SchoolContact, Skola24Child, Teacher, TimetableEntry, User, wrap, SSOSystem, Response
   } from '@skolplattformen/api'
 
 import EventEmitter from "events";
@@ -7,9 +7,10 @@ import { DateTime } from 'luxon';
 import { checkStatus, DummyStatusChecker } from './loginStatus'
 // import { scrapeChildren } from './parse/children';
 import { scrapeNews, scrapeNewsDetail } from './parse/news';
-import { extractAlingsasSamlAuthRequestForm, extractAlingsasSamlAuthResponseForm, extractSkola24FrameSource, extractSkola24LoginNovaSsoUrl } from './parse/parsers';
+import { extractAlingsasSamlAuthRequestForm, extractAlingsasSamlAuthResponseForm, extractSAMLLogin, extractSkola24FrameSource, extractSkola24LoginNovaSsoUrl } from './parse/parsers';
 import { parseTimetable } from './parse/skola24';
 import { scrapeMenus } from './parse/skolmaten';
+import { scrapeChildUrl, scrapeClassPeople, scrapeClassUrls, scrapeNotifications, scrapeNotificationsGuardianId } from './parse/unikum';
 import { scrapeUser } from './parse/user';
 import * as routes from './routes'
 
@@ -148,18 +149,6 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getChildren(): Promise<EtjanstChild[]> {
-    /*
-    let response = await this.fetch('current-user', routes.arena);
-
-    if (!response.ok) {
-      throw new Error(
-        `Server Error [${response.status}] [${response.statusText}] [${routes.arena}]`
-      )
-    }
-
-    const body = await response.text();
-    return await scrapeChildren(body);
-    */
    const skola24Children = await this.getSkola24Children();
    return skola24Children.map(child => {
      return {
@@ -176,7 +165,15 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getClassmates(child: EtjanstChild): Promise<Classmate[]> {
-    return [];
+    return await (await this.getClassPeople(child, 'elever')).map(classmate => {
+      return {
+        firstname: classmate.firstname,
+        lastname: classmate.lastname,
+        className: classmate.className,
+        guardians: [],
+        sisId: ''
+      }
+    });
   }
 
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
@@ -235,11 +232,32 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getNotifications(child: EtjanstChild): Promise<Notification[]> {
-    return [];
+    const unikumResponse = await this.authenticateWithUnikumAndGotoStartpage();
+    const unikumBaseUrl = routes.getBaseUrl((unikumResponse as any).url);
+    const unikumResponseText = await unikumResponse.text();
+    const notificationsUrl = routes.unikumNotificationsUrl((unikumResponse as any).url);
+    const notificationsResponse = await this.fetch('notifications', notificationsUrl);
+    const notificationsResponseText = await notificationsResponse.text();
+    const guardianId = scrapeNotificationsGuardianId(notificationsResponseText, child);
+    console.log('guardianId', guardianId);
+    const guardianNotificationsUrl = routes.unikumGuardianNotificationsUrl(unikumBaseUrl, guardianId);
+    const guardianNotificationsResponse = await this.fetch('notifications', guardianNotificationsUrl);
+    const guardianNotificationsResponseText = await guardianNotificationsResponse.text();
+    return scrapeNotifications(guardianNotificationsResponseText, unikumBaseUrl);
   }
 
   async getTeachers(child: EtjanstChild): Promise<Teacher[]> {
-    return [];
+    return (await this.getClassPeople(child, 'lärare')).map(teacher => {
+      return {
+        id: 0,
+        active: true,
+        firstname: teacher.firstname,
+        lastname: teacher.lastname,
+        sisId: '',
+        status: '',
+        timeTableAbbreviation: teacher.lastname.substring(0, 1).toUpperCase() + teacher.lastname.substring(teacher.lastname.length - 1).toUpperCase() + teacher.firstname.substring(0, 1).toUpperCase(),
+      }
+    });
   }
 
   async getSchedule(child: EtjanstChild, from: DateTime, to: DateTime): Promise<ScheduleItem[]> {
@@ -256,9 +274,11 @@ export class ApiArena extends EventEmitter implements Api {
   
   async getTimetable(child: Skola24Child, week: number, year: number, lang: string): Promise<TimetableEntry[]> {
     const childrenTimetables = await this.getSkola24Timetables();
+    console.log('childrenTimetables', childrenTimetables);
     const timetableForChild = childrenTimetables.find((timetable: any) => timetable.personGuid === child.personGuid);
+    console.log('timetableForChild', timetableForChild);
     if(!timetableForChild) {
-      throw new Error(`Could not find timetable for child ${child.firstName} ${child.lastName}`);
+      throw new Error(`Could not find timetable for child ${child.firstName} ${child.lastName} with id ${child.personGuid}`);
     }
 
     const timetableKeyResponse = await this.fetch('skola24-timetable-key', routes.skola24TimetableKey, {
@@ -405,5 +425,38 @@ export class ApiArena extends EventEmitter implements Api {
     "mode": "cors",
     "credentials": "include",
     "referrerPolicy": "strict-origin-when-cross-origin",
+  }
+
+  private async getClassPeople(child: EtjanstChild, type: 'elever' | 'lärare'): Promise<({ firstname: string, lastname: string, className: string})[]> {
+    const unikumResponse = await this.authenticateWithUnikumAndGotoStartpage();
+    const unikumResponseText = await unikumResponse.text();
+    const unikumBaseUrl = routes.getBaseUrl((unikumResponse as any).url);
+    const urlToChild = unikumBaseUrl + scrapeChildUrl(unikumResponseText, child);
+    const childResponse = await this.fetch('child', urlToChild);
+    const childResponseText = await childResponse.text();
+    const classUrls = scrapeClassUrls(childResponseText);
+    if(classUrls.length === 0){
+      return [];
+    }
+    const classUrl = unikumBaseUrl + classUrls[0].href;
+    const classResponse = await this.fetch('class', classUrl);
+    const classResponseText = await classResponse.text();
+    return scrapeClassPeople(classResponseText, type, classUrls[0].name);
+  }
+
+  private async authenticateWithUnikumAndGotoStartpage(): Promise<Response> {
+    const unikumResponse = await this.fetch('unikum', routes.unikum);
+    const unikumResponseText = await unikumResponse.text();
+    const samlForm = extractAlingsasSamlAuthResponseForm(unikumResponseText);
+    return await this.fetch(
+      'saml-login',
+      samlForm.action,
+      {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `SAMLResponse=${encodeURIComponent(samlForm.samlResponse)}&RelayState=${encodeURIComponent(samlForm.relayState)}`,
+      }
+    )
   }
 }

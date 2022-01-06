@@ -26,6 +26,12 @@ export const skola24Host = 'alingsas-sso.skola24.se';
 
 export const skolmaten = (schoolID: string) => `https://skolmaten.se/${schoolID}/`;
 
+export const unikum = 'https://idp.alingsas.se/skolfed/unikum';
+
+export const unikumNotificationsUrl = (startpageUrl: string) => startpageUrl.replace('start.html', 'notifications/notifications.html') + '&includeActedOn=false';
+
+export const unikumGuardianNotificationsUrl = (nikumBaseUrl: string, guardianId: string) => `${nikumBaseUrl}/unikum/notifications/guardian/${guardianId}/unread/list.ajax?startIndex=0`;
+
 export const getBaseUrl = (url: string) => {
   var path = url.split( '/' );
   return path[0] + '//' + path[2];
