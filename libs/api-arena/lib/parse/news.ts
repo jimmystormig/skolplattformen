@@ -52,6 +52,7 @@ export function scrapeNewsDetail(body: string, item: NewsItem){
     body = (body ? body + '\n\n' : '') + intro + (body || intro ? '\n\n' : '') + attached;
 
     item.header = header;
+    item.intro = intro;
     item.body = body;
     item.author = newsBlock.querySelector('.submitted .username')?.rawText;
     item.published = date.toISODate();

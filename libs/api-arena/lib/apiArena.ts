@@ -205,22 +205,16 @@ export class ApiArena extends EventEmitter implements Api {
       body = await custodianResponse.text();
     }
 
-    return await scrapeNews(body, child);
+    const news = await scrapeNews(body, child);
+
+    const details = news.map(n => this.fetchNewsDetails(n));
+    await Promise.all(details);
+
+    return news;
   }
 
   async getNewsDetails(child: EtjanstChild, item: NewsItem): Promise<any> {
-    // TODO Make news marked as read
-
-    let response = await this.fetch('current-user', routes.arenaNews(item.id));
-
-    if (!response.ok) {
-      throw new Error(
-        `Server Error [${response.status}] [${response.statusText}] [${routes.arena}]`
-      )
-    }
-
-    const body = await response.text();
-    await scrapeNewsDetail(body, item);
+    return { ...item };
   }
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {
@@ -365,6 +359,18 @@ export class ApiArena extends EventEmitter implements Api {
     const emitter = new DummyStatusChecker()
     emitter.token = 'fake'
     return emitter
+  }
+
+  private async fetchNewsDetails(item: NewsItem){
+    let response = await this.fetch('current-user', routes.arenaNews(item.id));
+    if (!response.ok) {
+      throw new Error(
+        `Server Error [${response.status}] [${response.statusText}] [${routes.arena}]`
+      )
+    }
+
+    const body = await response.text();
+    await scrapeNewsDetail(body, item);
   }
 
   private async authenticateWithSkola24(): Promise<void> {
