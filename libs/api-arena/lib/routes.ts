@@ -26,7 +26,9 @@ export const skola24Host = 'alingsas-sso.skola24.se';
 
 export const skolmaten = (schoolID: string) => `https://skolmaten.se/${schoolID}/`;
 
-export const unikum = 'https://idp.alingsas.se/skolfed/unikum';
+export const unikumSso = 'https://idp.alingsas.se/skolfed/unikum';
+
+export const unikumStart = 'https://start.unikum.net/unikum/start.html';
 
 export const unikumNotificationsUrl = (startpageUrl: string) => startpageUrl.replace('start.html', 'notifications/notifications.html') + '&includeActedOn=false';
 

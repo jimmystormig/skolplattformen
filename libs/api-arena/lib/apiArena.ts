@@ -100,6 +100,15 @@ export class ApiArena extends EventEmitter implements Api {
     status.on('OK', async () => {
       this.isLoggedIn = true
       this.personalNumber = personalNumber
+
+      console.log('login to Arena successful')
+
+      console.log('Authenticate with Skola24')
+      await this.authenticateWithSkola24();
+
+      console.log('Authenticate with Unikum')
+      await this.authenticateWithUnikum();
+
       this.emit('login')
     })
     status.on('ERROR', () => {
@@ -149,6 +158,7 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getChildren(): Promise<EtjanstChild[]> {
+    console.log('getSkola24Children');
    const skola24Children = await this.getSkola24Children();
    return skola24Children.map(child => {
      return {
@@ -232,14 +242,20 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getNotifications(child: EtjanstChild): Promise<Notification[]> {
+    const unikumStartResponse = await this.fetch('unikum-start', routes.unikumStart);
+    const unikumStartResponseUrl = (unikumStartResponse as any).url;
+    const unikumBaseUrl = routes.getBaseUrl(unikumStartResponseUrl);
+    
+    /*
     const unikumResponse = await this.authenticateWithUnikumAndGotoStartpage();
     const unikumBaseUrl = routes.getBaseUrl((unikumResponse as any).url);
     const unikumResponseText = await unikumResponse.text();
-    const notificationsUrl = routes.unikumNotificationsUrl((unikumResponse as any).url);
+    */
+
+    const notificationsUrl = routes.unikumNotificationsUrl(unikumStartResponseUrl);
     const notificationsResponse = await this.fetch('notifications', notificationsUrl);
     const notificationsResponseText = await notificationsResponse.text();
     const guardianId = scrapeNotificationsGuardianId(notificationsResponseText, child);
-    console.log('guardianId', guardianId);
     const guardianNotificationsUrl = routes.unikumGuardianNotificationsUrl(unikumBaseUrl, guardianId);
     const guardianNotificationsResponse = await this.fetch('notifications', guardianNotificationsUrl);
     const guardianNotificationsResponseText = await guardianNotificationsResponse.text();
@@ -269,16 +285,19 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getSkola24Children(): Promise<Skola24Child[]> {
+    console.log('getSkola24Children');
     return await this.getSkola24Timetables();
   }
   
   async getTimetable(child: Skola24Child, week: number, year: number, lang: string): Promise<TimetableEntry[]> {
+    if(!child.personGuid) {
+      return [];
+    }
+
     const childrenTimetables = await this.getSkola24Timetables();
-    console.log('childrenTimetables', childrenTimetables);
     const timetableForChild = childrenTimetables.find((timetable: any) => timetable.personGuid === child.personGuid);
-    console.log('timetableForChild', timetableForChild);
     if(!timetableForChild) {
-      throw new Error(`Could not find timetable for child ${child.firstName} ${child.lastName} with id ${child.personGuid}`);
+      throw new Error(`Could not find timetable for child ${child.firstName} ${child.lastName} with id ${child.personGuid} (timetables: ${JSON.stringify(childrenTimetables)})`);
     }
 
     const timetableKeyResponse = await this.fetch('skola24-timetable-key', routes.skola24TimetableKey, {
@@ -392,26 +411,40 @@ export class ApiArena extends EventEmitter implements Api {
 
   private async getSkola24Timetables(){
     const getSkola24ChildrenTimetables = async () => {
-      const timetablesResponse = await this.fetch('skola24-timetables', routes.skola24Timetables, {
-        method: 'POST',
-        body: '{"getPersonalTimetablesRequest":{"hostName":"' + routes.skola24Host + '"}}',
-        "headers": {
-          "referrer": "https://web.skola24.se/portal/start/timetable/timetable-viewer",
-          "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
-          ...this.skola24CommonHeaders
-        },
-      });
-      const timetables = await timetablesResponse.json();
+      let timetablesResponse;
+      try {
+        timetablesResponse = await this.fetch('skola24-timetables', routes.skola24Timetables, {
+          method: 'POST',
+          body: '{"getPersonalTimetablesRequest":{"hostName":"' + routes.skola24Host + '"}}',
+          "headers": {
+            "referrer": "https://web.skola24.se/portal/start/timetable/timetable-viewer",
+            "x-scope": "8a22163c-8662-4535-9050-bc5e1923df48",
+            ...this.skola24CommonHeaders
+          },
+        });
+      } catch (error) {
+        console.error('getSkola24ChildrenTimetables', error, timetablesResponse)
+        throw new Error('Failed to get timetables from Skola24')
+      }
+
+      const timetables = await timetablesResponse?.json();
       const childrenTimetables = timetables.data.getPersonalTimetablesResponse.childrenTimetables;
-      return childrenTimetables ? childrenTimetables : [];
+
+      if(!childrenTimetables || childrenTimetables.length === 0){
+        throw new Error('No timetables found');
+      }
+
+      return childrenTimetables;
     }
 
     let childrenTimetables = await getSkola24ChildrenTimetables();
+    /*
     if(childrenTimetables.length === 0) {
       // No timetables found, probably not logged in to Skola24 -> Login and try again
       await this.authenticateWithSkola24();
       childrenTimetables = await getSkola24ChildrenTimetables();
     }
+    */
     return childrenTimetables;
   }
 
@@ -428,9 +461,9 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   private async getClassPeople(child: EtjanstChild, type: 'elever' | 'lärare'): Promise<({ firstname: string, lastname: string, className: string})[]> {
-    const unikumResponse = await this.authenticateWithUnikumAndGotoStartpage();
-    const unikumResponseText = await unikumResponse.text();
-    const unikumBaseUrl = routes.getBaseUrl((unikumResponse as any).url);
+    const unikumStartResponse = await this.fetch('unikum-start', routes.unikumStart);
+    const unikumResponseText = await unikumStartResponse.text();
+    const unikumBaseUrl = routes.getBaseUrl((unikumStartResponse as any).url);
     const urlToChild = unikumBaseUrl + scrapeChildUrl(unikumResponseText, child);
     const childResponse = await this.fetch('child', urlToChild);
     const childResponseText = await childResponse.text();
@@ -444,11 +477,11 @@ export class ApiArena extends EventEmitter implements Api {
     return scrapeClassPeople(classResponseText, type, classUrls[0].name);
   }
 
-  private async authenticateWithUnikumAndGotoStartpage(): Promise<Response> {
-    const unikumResponse = await this.fetch('unikum', routes.unikum);
+  private async authenticateWithUnikum(): Promise<void> {
+    const unikumResponse = await this.fetch('unikum', routes.unikumSso);
     const unikumResponseText = await unikumResponse.text();
     const samlForm = extractAlingsasSamlAuthResponseForm(unikumResponseText);
-    return await this.fetch(
+    await this.fetch(
       'saml-login',
       samlForm.action,
       {

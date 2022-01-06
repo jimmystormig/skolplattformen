@@ -14,14 +14,15 @@ export function scrapeChildUrl(body: string, child: EtjanstChild): string | unde
 export function scrapeClassUrls(body: string): ({ href: string, name: string })[] {
     const doc = html.parse(body);
     return doc
-        .querySelectorAll('.row.relations .card.principalcard .card-body')
+        .querySelectorAll('.row.relations .card.principalcard.group .card-body')
+        .filter(cardBody => !cardBody.parentNode.classNames.includes('tuitiongroup'))
         .map(cardBody => {
             return {
                 href: cardBody.getAttribute('href') as string,
                 name: cardBody.getAttribute('data-testid') as string
             }
         })
-        .filter(c => c.name.match(/^[A-Z]{3}[0-9]{2}[A-Z|a-z|Å|å|Ä|ä|Ö|ö]*$/) !== null);
+        .filter(c => c.name.match(/^[A-Z|Å|Ä|Ö]{3}[0-9]{2}[0-9|A-Z|a-z|Å|å|Ä|ä|Ö|ö]*$/) !== null);
 }
 
 export function scrapeClassPeople(body: string, type: 'elever' | 'lärare', className: string): ({ firstname: string, lastname: string, className: string})[] {

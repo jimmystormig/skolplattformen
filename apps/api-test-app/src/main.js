@@ -79,6 +79,7 @@ async function run() {
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
       console.log(calendar)
+      */
 
       console.log('classmates')
       const classmates = await api.getClassmates(children[1])
@@ -88,6 +89,7 @@ async function run() {
       const teachers = await api.getTeachers(children[1])
       console.log(teachers)
 
+      /*
       try {
         console.log('schedule')
         const schedule = await api.getSchedule(
