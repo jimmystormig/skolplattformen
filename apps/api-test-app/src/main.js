@@ -78,8 +78,7 @@ async function run() {
       /*
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
-      console.log(calendar)
-      */
+      console.log(calendar)¨
 
       console.log('classmates')
       const classmates = await api.getClassmates(children[1])
@@ -89,7 +88,6 @@ async function run() {
       const teachers = await api.getTeachers(children[1])
       console.log(teachers)
 
-      /*
       try {
         console.log('schedule')
         const schedule = await api.getSchedule(
@@ -126,11 +124,11 @@ async function run() {
       }
       */
 
-      /*
       console.log('news')
       const news = await api.getNews(children[0])
       console.log(news)
 
+      /*
       console.log('news details')
       const newsItems = await Promise.all(
         news.map((newsItem) =>
@@ -144,11 +142,11 @@ async function run() {
       console.log('menu')
       const menu = await api.getMenu(children[0])
       console.log(menu)
-      */
 
       console.log('notifications')
       const notifications = await api.getNotifications(children[0])
       console.log(notifications)
+      */
 
       await api.logout()
     })

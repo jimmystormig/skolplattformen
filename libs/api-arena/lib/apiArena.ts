@@ -5,6 +5,7 @@ import {
 import EventEmitter from "events";
 import { DateTime } from 'luxon';
 import { checkStatus, DummyStatusChecker } from './loginStatus'
+import { getArenaAsCustodianUrl } from './parse/arena';
 // import { scrapeChildren } from './parse/children';
 import { scrapeNews, scrapeNewsDetail } from './parse/news';
 import { extractAlingsasSamlAuthRequestForm, extractAlingsasSamlAuthResponseForm, extractSAMLLogin, extractSkola24FrameSource, extractSkola24LoginNovaSsoUrl } from './parse/parsers';
@@ -195,7 +196,16 @@ export class ApiArena extends EventEmitter implements Api {
       )
     }
 
-    const body = await response.text();
+    const baseUrl = routes.getBaseUrl((response as any).url);
+    let body = await response.text();
+
+    // Special case when user is employed in Alingsås
+    const custodianUrl = getArenaAsCustodianUrl(body, baseUrl);
+    if(custodianUrl){
+      let custodianResponse = await this.fetch('current-user-custodian', custodianUrl);
+      body = await custodianResponse.text();
+    }
+
     return await scrapeNews(body, child);
   }
 
