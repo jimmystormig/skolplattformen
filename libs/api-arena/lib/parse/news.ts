@@ -29,26 +29,31 @@ export function scrapeNews(body: string, child: EtjanstChild): NewsItem[] {
     return news;
 }
 
-export function scrapeNewsDetail(body: string, item: NewsItem): NewsItem{
+export function scrapeNewsDetail(body: string, item: NewsItem){
     const doc = html.parse(decode(body));
-
     const newsBlock = doc.querySelector('.node-news');
-
-    // TODO Add attached files to body
-
-    // Date is in format '21 dec 2021'
     var rawDate = newsBlock.querySelector('.submitted .date-display-single')?.rawText;
     var date = DateTime.fromFormat(rawDate, 'dd MMM yyyy', { locale: 'sv' });
     var imageUrl = newsBlock.querySelector('.field-name-field-image img')?.getAttribute('src');
     var header = newsBlock.querySelector('h1 span')?.rawText;
+    var intro = newsBlock.querySelector('.field-name-field-introduction .field-item')?.rawText;
+    var body = newsBlock.querySelector('.field-name-body .field-item')?.rawText;
+    var attached = newsBlock.querySelectorAll('.field-name-field-attached-files .field-item a')
+        .map(a => {
+            return {
+                url: a.getAttribute('href'),
+                name: a.rawText
+            }
+        })
+        .reduce<string>((i, el) => {
+            return i + '[' + el.name + '](' + el.url + ')  \n'
+        }, '');
 
-    return {
-        id: item.id,
-        header: header,
-        intro: newsBlock.querySelector('.field-name-field-introduction .field-item')?.rawText,
-        body: newsBlock.querySelector('.field-name-body .field-item')?.rawText,
-        author: newsBlock.querySelector('.submitted .username')?.rawText,
-        published: date.toISO(),
-        fullImageUrl: imageUrl,
-    };
+    body = (body ? body + '\n\n' : '') + intro + (body || intro ? '\n\n' : '') + attached;
+
+    item.header = header;
+    item.body = body;
+    item.author = newsBlock.querySelector('.submitted .username')?.rawText;
+    item.published = date.toISODate();
+    item.fullImageUrl = imageUrl;
 }

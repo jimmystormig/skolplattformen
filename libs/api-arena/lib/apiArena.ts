@@ -220,7 +220,7 @@ export class ApiArena extends EventEmitter implements Api {
     }
 
     const body = await response.text();
-    return await scrapeNewsDetail(body, item);
+    await scrapeNewsDetail(body, item);
   }
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {
