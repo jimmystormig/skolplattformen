@@ -69,17 +69,18 @@ async function run() {
       console.log('user') //-
       const user = await api.getUser()
       console.log(user)
-      */
 
       console.log('children')
       const children = await api.getChildren()
       console.log(children)
+      */
+
+      console.log('calendar')
+      //const calendar = await api.getCalendar(children[0])
+      const calendar = await api.getCalendar(null)
+      console.log(calendar)
 
       /*
-      console.log('calendar')
-      const calendar = await api.getCalendar(children[0])
-      console.log(calendar)¨
-
       console.log('classmates')
       const classmates = await api.getClassmates(children[1])
       console.log(classmates)
@@ -122,13 +123,11 @@ async function run() {
       } catch (error) {
         console.error(error)
       }
-      */
 
       console.log('news')
       const news = await api.getNews(children[0])
       console.log(news)
 
-      /*
       console.log('news details')
       const newsItems = await Promise.all(
         news.map((newsItem) =>

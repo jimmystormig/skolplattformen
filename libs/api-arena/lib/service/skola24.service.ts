@@ -2,8 +2,7 @@ import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { DateTime } from 'luxon'
 import { Fetcher, Skola24Child, TimetableEntry } from '@skolplattformen/api'
-import { CommonService } from './common.service'
-
+import { extractSamlAuthResponseForm } from './common'
 export class Skola24Service {
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
@@ -73,11 +72,10 @@ export class Skola24Service {
     )
     const alingsasSamlAuthRequestResponseText =
       await alingsasSamlAuthRequestResponse.text()
-    const alingsasSamlAuthResponseForm =
-      CommonService.extractSamlAuthResponseForm(
-        alingsasSamlAuthRequestResponseText
-      )
-    const noveSsoSamlResponseResponse = await this.fetch(
+    const alingsasSamlAuthResponseForm = extractSamlAuthResponseForm(
+      alingsasSamlAuthRequestResponseText
+    )
+    await this.fetch(
       'skola24-nova-saml-auth',
       alingsasSamlAuthResponseForm.action,
       {
@@ -96,9 +94,8 @@ export class Skola24Service {
       }
     )
 
-    // TODO Check noveSsoSamlResponseResponse
-
     this.autenticated = true
+    this.log('Authenticated')
   }
 
   async getChildren(): Promise<Skola24Child[]> {

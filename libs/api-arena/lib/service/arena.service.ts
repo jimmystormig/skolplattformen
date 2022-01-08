@@ -1,10 +1,18 @@
 import EventEmitter from 'events'
 import * as html from 'node-html-parser'
 import { decode } from 'he'
-import { Fetcher, LoginStatusChecker } from '@skolplattformen/api'
+import { DateTime } from 'luxon'
+import {
+  EtjanstChild,
+  Fetcher,
+  LoginStatusChecker,
+  NewsItem,
+} from '@skolplattformen/api'
 import { DummyStatusChecker } from '../dummyStatusChecker'
+import { getBaseUrl } from './common'
 
 export class ArenaService {
+  static arenaStart: 'https://arena.alingsas.se'
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
   private routes = {
@@ -18,6 +26,7 @@ export class ArenaService {
     authLoginUrl: 'https://idp1.alingsas.se/wa/auth/saml/',
     samlLoginUrl: 'https://arena.alingsas.se/Shibboleth.sso/SAML2/POST',
     currentUser: 'https://arena.alingsas.se/user',
+    arenaNews: (newsPath: string) => `${ArenaService.arenaStart}${newsPath}`,
   }
 
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
@@ -123,6 +132,108 @@ export class ArenaService {
     }
   }
 
+  async getNews(child: EtjanstChild): Promise<NewsItem[]> {
+    let response = await this.fetch('current-user', ArenaService.arenaStart)
+    const baseUrl = getBaseUrl((response as any).url)
+    let body = await response.text()
+
+    body = await this.handleCustiodian(body, baseUrl)
+
+    const doc = html.parse(decode(body))
+    const childNews = doc
+      .querySelectorAll('.children .child .child-block')
+      .filter((block) => block.querySelector('h2')?.rawText === child.name)
+    const linksOfLinks = childNews.map((block) =>
+      block.querySelectorAll(
+        'ul.arena-guardian-child-info li.news-and-infoblock-item a'
+      )
+    )
+    const news: NewsItem[] = []
+
+    linksOfLinks.forEach((links) => {
+      links.forEach((link) => {
+        const viewed = link.classNames.indexOf('node-viewed') > -1 ? '' : '◉ '
+        news.push({
+          id: link.getAttribute('href') as string,
+          header: viewed + link.text,
+          published: '',
+        })
+      })
+    })
+
+    const details = news.map((n) => this.fetchNewsDetails(n))
+    await Promise.all(details)
+
+    return news
+  }
+
+  private async handleCustiodian(body: string, baseUrl: string) {
+    const custodianUrl = ArenaService.extractArenaAsCustodianUrl(body, baseUrl)
+
+    if (!custodianUrl) {
+      return body
+    }
+
+    let custodianResponse = await this.fetch(
+      'current-user-custodian',
+      custodianUrl
+    )
+    return await custodianResponse.text()
+  }
+
+  private async fetchNewsDetails(item: NewsItem) {
+    let response = await this.fetch(
+      'current-user',
+      this.routes.arenaNews(item.id)
+    )
+    if (!response.ok) {
+      throw new Error(
+        `Server Error [${response.status}] [${response.statusText}] [${ArenaService.arenaStart}]`
+      )
+    }
+
+    const responseText = await response.text()
+
+    const doc = html.parse(decode(responseText))
+    const newsBlock = doc.querySelector('.node-news')
+    var rawDate = newsBlock.querySelector(
+      '.submitted .date-display-single'
+    )?.rawText
+    var date = DateTime.fromFormat(rawDate, 'dd MMM yyyy', { locale: 'sv' })
+    var imageUrl = newsBlock
+      .querySelector('.field-name-field-image img')
+      ?.getAttribute('src')
+    var header = newsBlock.querySelector('h1 span')?.rawText
+    var intro = newsBlock.querySelector(
+      '.field-name-field-introduction .field-item'
+    )?.rawText
+    var body = newsBlock.querySelector('.field-name-body .field-item')?.rawText
+    var attached = newsBlock
+      .querySelectorAll('.field-name-field-attached-files .field-item a')
+      .map((a) => {
+        return {
+          url: a.getAttribute('href'),
+          name: a.rawText,
+        }
+      })
+      .reduce<string>((i, el) => {
+        return i + '[' + el.name + '](' + el.url + ')  \n'
+      }, '')
+
+    body =
+      (body ? body + '\n\n' : '') +
+      intro +
+      (body || intro ? '\n\n' : '') +
+      attached
+
+    item.header = header
+    item.intro = intro
+    item.body = body
+    item.author = newsBlock.querySelector('.submitted .username')?.rawText
+    item.published = date.toISODate()
+    item.fullImageUrl = imageUrl
+  }
+
   private async getStartpgageUrl(): Promise<string> {
     const startpageResponse = await this.fetch(
       'arena-startpage',
@@ -138,13 +249,9 @@ export class ArenaService {
     this.log('Generating auth ticket')
     const landingPageResponse = await this.fetch(
       'arena-bankid-landingpage',
-      this.routes.bankIdLandingPage(
-        ArenaService.getBaseUrl(startpageResponseUrl)
-      )
+      this.routes.bankIdLandingPage(getBaseUrl(startpageResponseUrl))
     )
-    const landingPageBaseUrl = ArenaService.getBaseUrl(
-      (landingPageResponse as any).url
-    )
+    const landingPageBaseUrl = getBaseUrl((landingPageResponse as any).url)
     await this.fetch(
       'arena-bankid-auth',
       this.routes.bankIdAuth(landingPageBaseUrl),
@@ -215,6 +322,21 @@ export class ArenaService {
     }
   }
 
+  private static extractArenaAsCustodianUrl(
+    body: string,
+    baseUrl: string
+  ): string | undefined {
+    const doc = html.parse(decode(body))
+    const anchor = doc.querySelector(
+      'a[href="/arena/guardian/masquerade-as-custodian"]'
+    )
+    if (anchor) {
+      return baseUrl + anchor.getAttribute('href')
+    }
+
+    return undefined
+  }
+
   private static extractAuthLoginRequestBody(signatureResponseText: string) {
     const signatureResponseDoc = html.parse(decode(signatureResponseText))
     const signatureResponseTextAreas =
@@ -264,11 +386,6 @@ export class ArenaService {
       emitter.emit('OK')
     }, 50)
     return emitter as LoginStatusChecker
-  }
-
-  private static getBaseUrl(url: string) {
-    var path = url.split('/')
-    return path[0] + '//' + path[2]
   }
 }
 
