@@ -34,7 +34,7 @@ export class ArenaService {
     this.log = (...data) => log('[arena-service]', ...data)
   }
 
-  async authenticate(personalNumber?: string): Promise<LoginStatusChecker> {
+  async authenticate(personalNumber?: string): Promise<ArenaStatusChecker> {
     this.log('Authenticating...')
 
     const startpageResponseUrl = await this.getStartpgageUrl()
@@ -385,11 +385,14 @@ export class ArenaService {
     setTimeout(() => {
       emitter.emit('OK')
     }, 50)
-    return emitter as LoginStatusChecker
+    return emitter as ArenaStatusChecker
   }
 }
 
-class ArenaStatusChecker extends EventEmitter implements LoginStatusChecker {
+export class ArenaStatusChecker
+  extends EventEmitter
+  implements LoginStatusChecker
+{
   private arenaService: ArenaService
   private basePollUrl: string
   private cancelled = false
@@ -399,7 +402,6 @@ class ArenaStatusChecker extends EventEmitter implements LoginStatusChecker {
     super()
     this.arenaService = arenaService
     this.basePollUrl = basePollUrl
-    this.check()
   }
 
   async check(): Promise<void> {

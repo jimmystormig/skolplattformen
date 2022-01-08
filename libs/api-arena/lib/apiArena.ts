@@ -53,7 +53,7 @@ export class ApiArena extends EventEmitter implements Api {
 
   getPersonalNumber = () => this.personalNumber
 
-  login = async (personalNumber?: string) => {
+  login = async (personalNumber?: string): Promise<LoginStatusChecker> => {
     if (personalNumber !== undefined && personalNumber.endsWith('1212121212'))
       return this.fakeMode()
 
@@ -73,6 +73,8 @@ export class ApiArena extends EventEmitter implements Api {
     status.on('ERROR', () => {
       this.personalNumber = undefined
     })
+
+    await status.check()
 
     return status
   }
