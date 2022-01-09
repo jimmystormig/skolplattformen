@@ -65,7 +65,6 @@ async function run() {
         )
       }
 
-      /*
       console.log('user') //-
       const user = await api.getUser()
       console.log(user)
@@ -140,7 +139,6 @@ async function run() {
       console.log('notifications')
       const notifications = await api.getNotifications(children[0])
       console.log(notifications)
-      */
 
       await api.logout()
     })

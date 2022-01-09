@@ -1,6 +1,11 @@
 import * as html from 'node-html-parser'
 import { decode } from 'he'
-import { EtjanstChild, Fetcher, Notification } from '@skolplattformen/api'
+import {
+  EtjanstChild,
+  Fetcher,
+  Notification,
+  Response,
+} from '@skolplattformen/api'
 import { extractSamlAuthResponseForm, getBaseUrl } from './common'
 
 export class UnikumService {
@@ -40,14 +45,36 @@ export class UnikumService {
     this.log('Authenticated')
   }
 
+  async isAuthenticated(): Promise<boolean> {
+    this.log('isAuthenticated')
+    let unikumResponse = await this.fetch('unikum', this.routes.unikumStart)
+    if (!UnikumService.isAuthenticated(unikumResponse)) {
+      this.log('Not authenticated, trying to authenticate')
+      await this.authenticate()
+      unikumResponse = await this.fetch('unikum', this.routes.unikumStart)
+      if (!UnikumService.isAuthenticated(unikumResponse)) {
+        this.log('Still not authenticated, giving up')
+        return false
+      }
+    }
+
+    return true
+  }
+
   async getClassPeople(
     child: EtjanstChild,
     type: 'elever' | 'lärare'
   ): Promise<{ firstname: string; lastname: string; className: string }[]> {
+    this.log('getClassPeople')
     const unikumStartResponse = await this.fetch(
       'unikum-start',
       this.routes.unikumStart
     )
+
+    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
+      return []
+    }
+
     const unikumResponseText = await unikumStartResponse.text()
     const unikumBaseUrl = getBaseUrl((unikumStartResponse as any).url)
     const urlToChild =
@@ -69,10 +96,16 @@ export class UnikumService {
   }
 
   async getNotifications(child: EtjanstChild): Promise<Notification[]> {
+    this.log('getNotifications')
     const unikumStartResponse = await this.fetch(
       'unikum-start',
       this.routes.unikumStart
     )
+
+    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
+      return []
+    }
+
     const unikumStartResponseUrl = (unikumStartResponse as any).url
     const unikumBaseUrl = getBaseUrl(unikumStartResponseUrl)
     const notificationsUrl = this.routes.unikumNotificationsUrl(
@@ -102,6 +135,9 @@ export class UnikumService {
       unikumBaseUrl
     )
   }
+
+  private static isAuthenticated = (startResponse: Response) =>
+    (startResponse as any).url.indexOf('login.jsp') === -1
 
   private static scrapeNotificationsGuardianId(
     body: string,

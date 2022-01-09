@@ -38,6 +38,7 @@ export class ArenaService {
     this.log('Authenticating...')
 
     const startpageResponseUrl = await this.getStartpgageUrl()
+
     if (this.isStartpage(startpageResponseUrl)) {
       this.log('Already authenticated')
       return ArenaService.emitOk()
@@ -64,6 +65,7 @@ export class ArenaService {
   }
 
   async getPollStatus(basePollUrl: string) {
+    this.log('getPollStatus')
     const pollStatusResponse = await this.fetch(
       'arena-bankid-status',
       this.routes.pollStatus(basePollUrl)
@@ -81,23 +83,30 @@ export class ArenaService {
   }
 
   async login(signatureUrl: string) {
+    this.log('login')
     const authLoginBody = await this.getSigntureAuthBody(signatureUrl)
     const samlLoginBody = await this.getSamlLoginBody(authLoginBody)
     await this.samlLogin(samlLoginBody)
   }
 
   async getUser() {
-    this.log('Getting user')
-
+    this.log('getUser')
+    /*
     const getUserResponse = async () => {
       return await this.fetch('arena-current-user', this.routes.currentUser)
     }
+    */
 
-    let userPageResponse = await getUserResponse()
+    //let userPageResponse = await getUserResponse()
+    let userPageResponse = await this.fetch(
+      'arena-current-user',
+      this.routes.currentUser
+    )
     if (userPageResponse.status !== 200) {
       return { isAuthenticated: false }
     }
 
+    /*
     if ((userPageResponse as any).url !== this.routes.currentUser) {
       // Response was redirected, some cookie was probably missing, try again
       userPageResponse = await getUserResponse()
@@ -109,6 +118,7 @@ export class ArenaService {
         return { isAuthenticated: false }
       }
     }
+    */
 
     var body = await userPageResponse.text()
 
@@ -133,6 +143,7 @@ export class ArenaService {
   }
 
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
+    this.log('getNews')
     let response
     try {
       response = await this.fetch('current-user', ArenaService.arenaStart)

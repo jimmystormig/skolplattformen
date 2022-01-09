@@ -13,7 +13,7 @@ import {
   useStyleSheet,
 } from '@ui-kitten/components'
 import Personnummer from 'personnummer'
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import {
   Image,
   Linking,
@@ -77,6 +77,7 @@ export const Login = () => {
   const { currentSchoolPlatform, changeSchoolPlatform } = useContext(
     SchoolPlatformContext
   )
+  const mountedRef = useRef(true)
 
   const { t } = useTranslation()
 
@@ -95,9 +96,21 @@ export const Login = () => {
   }
 
   useEffect(() => {
-    api.on('login', loginHandler)
+    api.on('login', async () => {
+      if (!mountedRef.current) return null
+        await loginHandler()
+    })
     return () => {
-      api.off('login', loginHandler)
+      api.off('login', async () => {
+        if (!mountedRef.current) return null
+        await loginHandler()
+      })
+
+      // Use useRef to fix the error `Can't perform a React state update on an unmounted component.
+      // This is a no-op, but it indicates a memory leak in your application. To fix, cancel all
+      // subscriptions and asynchronous tasks in a useEffect cleanup function.
+      // Source: https://stackoverflow.com/a/60693711
+      mountedRef.current = false
     }
   }, [api])
 

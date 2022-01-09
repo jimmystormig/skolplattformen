@@ -25,10 +25,12 @@ export class AlingsasService {
     const doc = html.parse(decode(responseText))
 
     interface CalendarItemExtended extends CalendarItem {
+      filterableStartDate: any
       filterableEndDate: any
     }
 
     const today = DateTime.local({ zone: 'Europe/Stockholm' })
+    const inAYear = today.plus({ years: 1 })
     const items: CalendarItemExtended[] = []
 
     let autumnTermYear: number, springTermYear: number
@@ -83,6 +85,7 @@ export class AlingsasService {
             id: AlingsasService.hashCode(title) + date.toMillis(),
             title: title,
             startDate: date.toISODate(),
+            filterableStartDate: date,
             endDate: endDate.toISODate(),
             filterableEndDate: endDate,
             allDay: true,
@@ -111,6 +114,7 @@ export class AlingsasService {
             id: AlingsasService.hashCode(item) + date.toMillis(),
             title: item,
             startDate: date.toISODate(),
+            filterableStartDate: date,
             endDate: date.toISODate(),
             filterableEndDate: date,
             allDay: true,
@@ -135,6 +139,7 @@ export class AlingsasService {
             id: AlingsasService.hashCode(item) + date.toMillis(),
             title: item,
             startDate: date.toISODate(),
+            filterableStartDate: date,
             endDate: date.toISODate(),
             filterableEndDate: date,
             allDay: true,
@@ -157,6 +162,7 @@ export class AlingsasService {
               id: AlingsasService.hashCode(item) + date.toMillis(),
               title: item,
               startDate: date.toISODate(),
+              filterableStartDate: date,
               endDate: date.toISODate(),
               filterableEndDate: date,
               allDay: true,
@@ -187,6 +193,7 @@ export class AlingsasService {
                 id: AlingsasService.hashCode(item) + startDate.toMillis(),
                 title: item,
                 startDate: startDate.toISODate(),
+                filterableStartDate: startDate,
                 endDate: endDate.toISODate(),
                 filterableEndDate: endDate,
                 allDay: true,
@@ -218,6 +225,7 @@ export class AlingsasService {
                 id: AlingsasService.hashCode(item) + date.toMillis(),
                 title: title,
                 startDate: date.toISODate(),
+                filterableStartDate: date,
                 endDate: date.toISODate(),
                 filterableEndDate: date,
                 allDay: true,
@@ -253,6 +261,7 @@ export class AlingsasService {
               id: AlingsasService.hashCode(item) + date.toMillis(),
               title: item,
               startDate: date.toISODate(),
+              filterableStartDate: date,
               endDate: date.toISODate(),
               filterableEndDate: date,
               allDay: true,
@@ -278,6 +287,7 @@ export class AlingsasService {
               id: AlingsasService.hashCode(item) + date.toMillis(),
               title: item,
               startDate: date.toISODate(),
+              filterableStartDate: date,
               endDate: date.toISODate(),
               filterableEndDate: date,
               allDay: true,
@@ -288,7 +298,10 @@ export class AlingsasService {
         }
       })
 
-    return items.filter((item) => item.filterableEndDate >= today)
+    return items.filter(
+      (item) =>
+        item.filterableEndDate >= today && item.filterableStartDate < inAYear
+    )
   }
 
   private static hashCode(str: string): number {

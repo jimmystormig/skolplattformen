@@ -82,9 +82,19 @@ export class ApiArena extends EventEmitter implements Api {
   setSessionCookie = async (sessionCookie: string) => {
     this.cookieManager.setCookieString(sessionCookie, ArenaService.arenaStart)
 
-    const user = await this.getUser()
-    if (!user.isAuthenticated) {
-      throw new Error('Session cookie is expired')
+    const [arenaIsAuthenticatd, skola24IsAuthenticated, unikumIsAuthenticated] =
+      await Promise.all([
+        this.isAuthenticated(),
+        this.skola24Service.isAuthenticated(),
+        this.unikumService.isAuthenticated(),
+      ])
+    if (
+      !arenaIsAuthenticatd ||
+      !skola24IsAuthenticated ||
+      !unikumIsAuthenticated
+    ) {
+      throw new Error('Session cookies has expired')
+      // TODO Should we logout?
     }
 
     this.isLoggedIn = true
@@ -177,6 +187,11 @@ export class ApiArena extends EventEmitter implements Api {
     this.personalNumber = undefined
     this.cookieManager.clearAll()
     this.emit('logout')
+  }
+
+  async isAuthenticated() {
+    const user = await this.getUser()
+    return user.isAuthenticated
   }
 
   private async fakeMode(): Promise<LoginStatusChecker> {

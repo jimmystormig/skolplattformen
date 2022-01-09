@@ -98,7 +98,27 @@ export class Skola24Service {
     this.log('Authenticated')
   }
 
+  async isAuthenticated() {
+    this.log('isAuthenticated')
+    let children = await this.getChildren()
+
+    if (children.length === 0) {
+      this.log('Not authenticated, trying to authenticate')
+      await this.authenticate()
+      children = await this.getChildren()
+    }
+
+    if (children.length === 0) {
+      this.log('Still not authenticated, giving up')
+      this.autenticated = false
+      return false
+    }
+
+    return true
+  }
+
   async getChildren(): Promise<Skola24Child[]> {
+    this.log('getChildren')
     const timetablesResponse = await this.fetch(
       'skola24-timetables',
       this.routes.skola24Timetables,
@@ -127,11 +147,16 @@ export class Skola24Service {
     week: number,
     year: number
   ): Promise<TimetableEntry[]> {
+    this.log('getTimetable')
     if (!child.personGuid) {
       return []
     }
 
     const childrenTimetables = await this.getChildren()
+    if (childrenTimetables.length === 0) {
+      return []
+    }
+
     const timetableForChild = childrenTimetables.find(
       (timetable: any) => timetable.personGuid === child.personGuid
     )
