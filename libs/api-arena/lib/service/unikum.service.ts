@@ -240,7 +240,7 @@ export class UnikumService {
         const anchor = notification.childNodes[3] as any as HTMLElement
         const href = anchor.getAttribute('href') as string
         const message = (anchor.childNodes[2] as any)?.rawText
-          .replace(/(?:\r\n|\r|\n)/g, '')
+          .replace(/(?:\r\n|\r|\n)/g, ' ')
           .replace(/\s\s+/g, ' ')
           .trim()
         const date = anchor
