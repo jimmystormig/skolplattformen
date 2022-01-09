@@ -65,14 +65,17 @@ async function run() {
         )
       }
 
+      /*
       console.log('user') //-
       const user = await api.getUser()
       console.log(user)
+      */
 
       console.log('children')
       const children = await api.getChildren()
       console.log(children)
 
+      /*
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
       console.log(calendar)
@@ -117,6 +120,7 @@ async function run() {
       } catch (error) {
         console.error(error)
       }
+      */
 
       console.log('news')
       const news = await api.getNews(children[0])
@@ -132,6 +136,7 @@ async function run() {
       )
       console.log(newsItems)
 
+      /*
       console.log('menu')
       const menu = await api.getMenu(children[0])
       console.log(menu)
@@ -139,6 +144,7 @@ async function run() {
       console.log('notifications')
       const notifications = await api.getNotifications(children[0])
       console.log(notifications)
+      */
 
       await api.logout()
     })

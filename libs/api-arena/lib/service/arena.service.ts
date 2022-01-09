@@ -227,8 +227,16 @@ export class ArenaService {
     )?.rawText
     var body = newsBlock
       .querySelector('.field-name-body .field-item')
-      ?.innerHTML.replace(/<p>|<\/p>/g, '')
+      ?.innerHTML.replace(/<p>&nbsp;<\/p>\n/g, '')
+      .replace(/<p>|<\/p>/g, '')
       .replace(/<a.*?href=["']([^"']*)["'][^>]*>([^<]*)<\/a>/gim, '[$2]($1)')
+      .replace(/<\/?ul>\n/gim, '')
+      .replace(/<li>/gim, '* ')
+      .replace(/<\/li>/gim, '')
+      .replace(/^[ \t]+/gm, '')
+
+    console.log(body)
+
     var attached = newsBlock
       .querySelectorAll('.field-name-field-attached-files .field-item a')
       .map((a) => {
@@ -242,11 +250,14 @@ export class ArenaService {
       }, '')
 
     body =
-      (body ? body + '\n\n' : '') +
-      intro +
-      (body || intro ? '\n\n' : '') +
+      (intro || '') +
+      (intro ? '\n\n' : '') +
+      (body || '') +
+      (body ? '\n\n' : '') +
       attached
 
+    // Do not set header to keep indication that this news is not read that was set in getNews()
+    // item.header = header
     item.intro = intro
     item.body = body
     item.author = newsBlock.querySelector('.submitted .username')?.rawText
