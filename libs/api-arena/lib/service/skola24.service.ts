@@ -117,7 +117,9 @@ export class Skola24Service {
       }
     )
     const timetables = await timetablesResponse?.json()
-    return timetables.data.getPersonalTimetablesResponse.childrenTimetables
+    const childrenTimetables =
+      timetables.data.getPersonalTimetablesResponse.childrenTimetables
+    return childrenTimetables || []
   }
 
   async getTimetable(

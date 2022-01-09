@@ -172,6 +172,7 @@ export class ApiArena extends EventEmitter implements Api {
   ) => await this.skola24Service.getTimetable(child, week, year)
 
   logout = async () => {
+    this.isFake = false
     this.isLoggedIn = false
     this.personalNumber = undefined
     this.cookieManager.clearAll()

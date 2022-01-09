@@ -12,7 +12,7 @@ import { DummyStatusChecker } from '../dummyStatusChecker'
 import { getBaseUrl } from './common'
 
 export class ArenaService {
-  static arenaStart: 'https://arena.alingsas.se'
+  static arenaStart = 'https://arena.alingsas.se'
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
   private routes = {
@@ -133,7 +133,20 @@ export class ArenaService {
   }
 
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
-    let response = await this.fetch('current-user', ArenaService.arenaStart)
+    let response
+    try {
+      response = await this.fetch('current-user', ArenaService.arenaStart)
+    } catch (error) {
+      throw new Error(
+        'Failed to fetch current user, error:' +
+          JSON.stringify(error) +
+          ', response:' +
+          JSON.stringify(response) +
+          ', url:' +
+          ArenaService.arenaStart
+      )
+    }
+
     const baseUrl = getBaseUrl((response as any).url)
     let body = await response.text()
 
@@ -186,12 +199,6 @@ export class ArenaService {
       'current-user',
       this.routes.arenaNews(item.id)
     )
-    if (!response.ok) {
-      throw new Error(
-        `Server Error [${response.status}] [${response.statusText}] [${ArenaService.arenaStart}]`
-      )
-    }
-
     const responseText = await response.text()
 
     const doc = html.parse(decode(responseText))
@@ -207,7 +214,10 @@ export class ArenaService {
     var intro = newsBlock.querySelector(
       '.field-name-field-introduction .field-item'
     )?.rawText
-    var body = newsBlock.querySelector('.field-name-body .field-item')?.rawText
+    var body = newsBlock
+      .querySelector('.field-name-body .field-item')
+      ?.innerHTML.replace(/<p>|<\/p>/g, '')
+      .replace(/<a.*?href=["']([^"']*)["'][^>]*>([^<]*)<\/a>/gim, '[$2]($1)')
     var attached = newsBlock
       .querySelectorAll('.field-name-field-attached-files .field-item a')
       .map((a) => {
@@ -226,7 +236,6 @@ export class ArenaService {
       (body || intro ? '\n\n' : '') +
       attached
 
-    item.header = header
     item.intro = intro
     item.body = body
     item.author = newsBlock.querySelector('.submitted .username')?.rawText
