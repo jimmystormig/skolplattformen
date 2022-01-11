@@ -16,7 +16,6 @@ export class ArenaService {
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
   private routes = {
-    startpage: 'https://arena.alingsas.se',
     bankIdLandingPage: (baseUrl: string) =>
       baseUrl + '/wa/auth?authmech=tc6wyb5ukmps',
     bankIdAuth: (baseUrl: string) =>
@@ -91,13 +90,7 @@ export class ArenaService {
 
   async getUser() {
     this.log('getUser')
-    /*
-    const getUserResponse = async () => {
-      return await this.fetch('arena-current-user', this.routes.currentUser)
-    }
-    */
 
-    //let userPageResponse = await getUserResponse()
     let userPageResponse = await this.fetch(
       'arena-current-user',
       this.routes.currentUser
@@ -105,20 +98,6 @@ export class ArenaService {
     if (userPageResponse.status !== 200) {
       return { isAuthenticated: false }
     }
-
-    /*
-    if ((userPageResponse as any).url !== this.routes.currentUser) {
-      // Response was redirected, some cookie was probably missing, try again
-      userPageResponse = await getUserResponse()
-      if (
-        userPageResponse.status !== 200 ||
-        (userPageResponse as any).url !== this.routes.currentUser
-      ) {
-        // Give up
-        return { isAuthenticated: false }
-      }
-    }
-    */
 
     var body = await userPageResponse.text()
 
@@ -144,19 +123,7 @@ export class ArenaService {
 
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
     this.log('getNews')
-    let response
-    try {
-      response = await this.fetch('current-user', ArenaService.arenaStart)
-    } catch (error) {
-      throw new Error(
-        'Failed to fetch current user, error:' +
-          JSON.stringify(error) +
-          ', response:' +
-          JSON.stringify(response) +
-          ', url:' +
-          ArenaService.arenaStart
-      )
-    }
+    const response = await this.fetch('current-user', ArenaService.arenaStart)
 
     const baseUrl = getBaseUrl((response as any).url)
     let body = await response.text()
@@ -179,7 +146,7 @@ export class ArenaService {
         const viewed = link.classNames.indexOf('node-viewed') > -1 ? '' : '◉ '
         news.push({
           id: link.getAttribute('href') as string,
-          header: viewed + link.text,
+          header: viewed + link.text.replace(' »', ''),
           published: '',
         })
       })
@@ -211,9 +178,8 @@ export class ArenaService {
       this.routes.arenaNews(item.id)
     )
     const responseText = await response.text()
-
     const doc = html.parse(decode(responseText))
-    const newsBlock = doc.querySelector('.node-news')
+    const newsBlock = doc.querySelector('#block-system-main')
     var rawDate = newsBlock.querySelector(
       '.submitted .date-display-single'
     )?.rawText
@@ -229,14 +195,12 @@ export class ArenaService {
       .querySelector('.field-name-body .field-item')
       ?.innerHTML.replace(/<p>&nbsp;<\/p>\n/g, '')
       .replace(/<p>|<\/p>/g, '')
+      .replace(/<br>/g, '')
       .replace(/<a.*?href=["']([^"']*)["'][^>]*>([^<]*)<\/a>/gim, '[$2]($1)')
       .replace(/<\/?ul>\n/gim, '')
       .replace(/<li>/gim, '* ')
       .replace(/<\/li>/gim, '')
       .replace(/^[ \t]+/gm, '')
-
-    console.log(body)
-
     var attached = newsBlock
       .querySelectorAll('.field-name-field-attached-files .field-item a')
       .map((a) => {
@@ -268,7 +232,7 @@ export class ArenaService {
   private async getStartpgageUrl(): Promise<string> {
     const startpageResponse = await this.fetch(
       'arena-startpage',
-      this.routes.startpage
+      ArenaService.arenaStart
     )
     return (startpageResponse as any).url as string
   }
@@ -299,7 +263,7 @@ export class ArenaService {
   }
 
   private isStartpage = (startpageResponseUrl: string) =>
-    startpageResponseUrl.startsWith(this.routes.startpage)
+    startpageResponseUrl.startsWith(ArenaService.arenaStart)
 
   private async getSigntureAuthBody(signatureUrl: string) {
     const signatureResponse = await this.fetch(

@@ -72,7 +72,7 @@ export class UnikumService {
     )
 
     if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      return []
+      throw new Error('Session cookie is expired')
     }
 
     const unikumResponseText = await unikumStartResponse.text()
@@ -103,7 +103,7 @@ export class UnikumService {
     )
 
     if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      return []
+      throw new Error('Session cookie is expired')
     }
 
     const unikumStartResponseUrl = (unikumStartResponse as any).url

@@ -80,6 +80,7 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   setSessionCookie = async (sessionCookie: string) => {
+    console.log('setSessionCookie', sessionCookie)
     this.cookieManager.setCookieString(sessionCookie, ArenaService.arenaStart)
 
     const [arenaIsAuthenticatd, skola24IsAuthenticated, unikumIsAuthenticated] =

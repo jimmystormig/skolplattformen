@@ -35,9 +35,11 @@ export class AlingsasService {
 
     let autumnTermYear: number, springTermYear: number
 
-    const texts = doc
-      .querySelector('.entry-content')
-      .childNodes.map((item) => {
+    doc
+      .querySelectorAll(
+        '.entry-content p, .entry-content h2, .entry-content ul'
+      )
+      .map((item) => {
         if ((item as any).rawTagName === 'ul') {
           return item.childNodes.map((child) =>
             child
@@ -50,7 +52,7 @@ export class AlingsasService {
         return [item.rawText.trim()]
       })
       .flat()
-      .filter((item) => item.length > 0)
+      .filter((item) => item && item.length > 0 && item !== 'NULL')
       .map((item) => {
         let didMatchTermYear = false
         const termYearExp = /läsår ([0-9]{4})\/([0-9]{4})/gi
@@ -79,7 +81,7 @@ export class AlingsasService {
             weekNumber: parseInt(week),
             weekday: 1,
           })
-          const endDate = date.plus({ days: 6 })
+          const endDate = date.plus({ weeks: 1 })
 
           items.push({
             id: AlingsasService.hashCode(title) + date.toMillis(),
@@ -219,7 +221,7 @@ export class AlingsasService {
                 month: parseInt(yearDayMonthMatch.split('/')[1]),
                 day: parseInt(yearDayMonthMatch.split('/')[0]),
               })
-              const title = item.replace(/\n/g, '')
+              const title = item.replace(/\n/g, ' ').replace(/\s\s+/g, ' ')
 
               items.push({
                 id: AlingsasService.hashCode(item) + date.toMillis(),
@@ -295,6 +297,17 @@ export class AlingsasService {
 
             underTheYearDidMatch = true
           }
+        }
+
+        if (
+          !didMatchWeek &&
+          !didMatchTerm &&
+          !startsDidMatch &&
+          !didMatchWeeks &&
+          !yearDayMonthDidMatch &&
+          !underTheYearDidMatch
+        ) {
+          this.log('Unmatched item: ' + item)
         }
       })
 

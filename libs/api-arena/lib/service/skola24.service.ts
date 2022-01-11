@@ -139,7 +139,12 @@ export class Skola24Service {
     const timetables = await timetablesResponse?.json()
     const childrenTimetables =
       timetables.data.getPersonalTimetablesResponse.childrenTimetables
-    return childrenTimetables || []
+
+    if (childrenTimetables.length === 0) {
+      throw new Error('Session cookie is expired')
+    }
+
+    return childrenTimetables
   }
 
   async getTimetable(
@@ -223,37 +228,39 @@ export class Skola24Service {
 
     const timetable = await timetableResponse.json()
 
+    if (!timetable.data.lessonInfo) {
+      throw new Error('Session cookie is expired')
+    }
+
     return timetable.data.lessonInfo
-      ? timetable.data.lessonInfo
-          .map((lesson: any) => {
-            return {
-              id: lesson.guidId,
-              teacher: lesson.texts[1],
-              location: lesson.texts[2],
-              timeStart: lesson.timeStart,
-              timeEnd: lesson.timeEnd,
-              dayOfWeek: lesson.dayOfWeekNumber,
-              name: lesson.texts[0],
-              dateStart: DateTime.fromObject({
-                weekYear: year,
-                weekNumber: week,
-                weekday: lesson.dayOfWeekNumber,
-              }).toISODate(),
-              dateEnd: DateTime.fromObject({
-                weekYear: year,
-                weekNumber: week,
-                weekday: lesson.dayOfWeekNumber,
-              }).toISODate(),
-            }
-          })
-          .sort((a: TimetableEntry, b: TimetableEntry) => {
-            if (a.dayOfWeek === b.dayOfWeek) {
-              return a.timeStart < b.timeStart ? -1 : 1
-            } else {
-              return a.dayOfWeek < b.dayOfWeek ? -1 : 1
-            }
-          })
-      : []
+      .map((lesson: any) => {
+        return {
+          id: lesson.guidId,
+          teacher: lesson.texts[1],
+          location: lesson.texts[2],
+          timeStart: lesson.timeStart,
+          timeEnd: lesson.timeEnd,
+          dayOfWeek: lesson.dayOfWeekNumber,
+          name: lesson.texts[0],
+          dateStart: DateTime.fromObject({
+            weekYear: year,
+            weekNumber: week,
+            weekday: lesson.dayOfWeekNumber,
+          }).toISODate(),
+          dateEnd: DateTime.fromObject({
+            weekYear: year,
+            weekNumber: week,
+            weekday: lesson.dayOfWeekNumber,
+          }).toISODate(),
+        }
+      })
+      .sort((a: TimetableEntry, b: TimetableEntry) => {
+        if (a.dayOfWeek === b.dayOfWeek) {
+          return a.timeStart < b.timeStart ? -1 : 1
+        } else {
+          return a.dayOfWeek < b.dayOfWeek ? -1 : 1
+        }
+      })
   }
 
   private skola24CommonHeaders = {
