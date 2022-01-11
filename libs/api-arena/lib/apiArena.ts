@@ -8,6 +8,7 @@ import {
   LoginStatusChecker,
   NewsItem,
   Skola24Child,
+  User,
   wrap,
 } from '@skolplattformen/api'
 
@@ -108,7 +109,29 @@ export class ApiArena extends EventEmitter implements Api {
     }
   }
 
-  getUser = async () => this.arenaService.getUser()
+  getUser = async () => {
+    const user = await this.arenaService.getUser()
+
+    if (user.isAuthenticated) {
+      this.log('User is authenticated, checking other services')
+      const [skola24IsAuthenticated, unikumIsAuthenticated] = await Promise.all(
+        [
+          this.skola24Service.isAuthenticated(),
+          this.unikumService.isAuthenticated(),
+        ]
+      )
+      if (!skola24IsAuthenticated || !unikumIsAuthenticated) {
+        this.log(
+          `User is authenticated but not authenticated in other services (skola24: ${skola24IsAuthenticated}, unikum: ${unikumIsAuthenticated})`
+        )
+        return { isauthenticated: false } as User
+      }
+    } else {
+      this.log('User is not authenticated')
+    }
+
+    return user
+  }
 
   getChildren = async () =>
     (await this.getSkola24Children()).map((child) => {

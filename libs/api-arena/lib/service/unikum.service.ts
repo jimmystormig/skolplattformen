@@ -70,11 +70,6 @@ export class UnikumService {
       'unikum-start',
       this.routes.unikumStart
     )
-
-    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      throw new Error('Session cookie is expired')
-    }
-
     const unikumResponseText = await unikumStartResponse.text()
     const unikumBaseUrl = getBaseUrl((unikumStartResponse as any).url)
     const urlToChild =
@@ -101,11 +96,6 @@ export class UnikumService {
       'unikum-start',
       this.routes.unikumStart
     )
-
-    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      throw new Error('Session cookie is expired')
-    }
-
     const unikumStartResponseUrl = (unikumStartResponse as any).url
     const unikumBaseUrl = getBaseUrl(unikumStartResponseUrl)
     const notificationsUrl = this.routes.unikumNotificationsUrl(

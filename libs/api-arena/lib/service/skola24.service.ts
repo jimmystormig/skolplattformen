@@ -13,9 +13,12 @@ export class Skola24Service {
     skola24Host: 'alingsas-sso.skola24.se',
     skola24TimetableKey: 'https://web.skola24.se/api/get/timetable/render/key',
     skola24Timetable: 'https://web.skola24.se/api/render/timetable',
+    skola24PreSchools: 'https://web.skola24.se/api/get/preschools',
+    skola24PreSchoolStudents:
+      'https://web.skola24.se/api/get/groups/per/preschools/with/students',
+    skola24Timeframes:
+      'https://web.skola24.se/api/get/timetable/day/with/timeframes/day',
   }
-  private autenticated = false
-
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[skola24-service]', ...data)
@@ -23,12 +26,6 @@ export class Skola24Service {
 
   async authenticate() {
     this.log('Authenticating...')
-
-    if (this.autenticated) {
-      this.log('Already authenticated')
-      return
-    }
-
     const skola24Response = await this.fetch(
       'skola24-start',
       this.routes.skola24
@@ -93,8 +90,6 @@ export class Skola24Service {
         },
       }
     )
-
-    this.autenticated = true
     this.log('Authenticated')
   }
 
@@ -110,7 +105,6 @@ export class Skola24Service {
 
     if (children.length === 0) {
       this.log('Still not authenticated, giving up')
-      this.autenticated = false
       return false
     }
 
@@ -137,14 +131,10 @@ export class Skola24Service {
       }
     )
     const timetables = await timetablesResponse?.json()
-    const childrenTimetables =
-      timetables.data.getPersonalTimetablesResponse.childrenTimetables
-
-    if (childrenTimetables.length === 0) {
-      throw new Error('Session cookie is expired')
-    }
-
-    return childrenTimetables
+    timetables.data.getPersonalTimetablesResponse.childrenTimetables
+    return (
+      timetables.data.getPersonalTimetablesResponse.childrenTimetables || []
+    )
   }
 
   async getTimetable(
@@ -228,39 +218,172 @@ export class Skola24Service {
 
     const timetable = await timetableResponse.json()
 
-    if (!timetable.data.lessonInfo) {
-      throw new Error('Session cookie is expired')
+    const lessonInfo = timetable.data.lessonInfo
+      ? timetable.data.lessonInfo.map((lesson: any) => {
+          return {
+            id: lesson.guidId,
+            teacher: lesson.texts[1],
+            location: lesson.texts[2],
+            timeStart: lesson.timeStart,
+            timeEnd: lesson.timeEnd,
+            dayOfWeek: lesson.dayOfWeekNumber,
+            name: lesson.texts[0],
+            dateStart: DateTime.fromObject({
+              weekYear: year,
+              weekNumber: week,
+              weekday: lesson.dayOfWeekNumber,
+            }).toISODate(),
+            dateEnd: DateTime.fromObject({
+              weekYear: year,
+              weekNumber: week,
+              weekday: lesson.dayOfWeekNumber,
+            }).toISODate(),
+          }
+        })
+      : []
+
+    const today = DateTime.local().toISODate()
+
+    const preSchoolsResponse = await this.fetch(
+      'skola24-pre-schools',
+      this.routes.skola24PreSchools,
+      {
+        method: 'POST',
+        body: 'null',
+        headers: {
+          referrer:
+            'https://web.skola24.se/portal/start/timetable/timetable-exception',
+          'x-scope': '47b9ccc3-3b42-4c45-a2c9-0e60d11d9dc8',
+          ...this.skola24CommonHeaders,
+        },
+      }
+    )
+
+    const preSchools = await preSchoolsResponse.json()
+    const preSchoolGuid = preSchools.data.schools[0].guid
+
+    const preSchoolStudentsBody = JSON.stringify({
+      schoolGuids: [preSchoolGuid],
+      groupDates: { start: today, end: today },
+      groupGuids: [],
+      includeStudents: true,
+      includeArchived: false,
+      dateFrom: today,
+      dateTo: today,
+    })
+    const skola24PreSchoolStudentsResponse = await this.fetch(
+      'skola24-pre-school-stundents',
+      this.routes.skola24PreSchoolStudents,
+      {
+        method: 'POST',
+        body: preSchoolStudentsBody,
+        headers: {
+          referrer:
+            'https://web.skola24.se/portal/start/timetable/timetable-exception',
+          'x-scope': '47b9ccc3-3b42-4c45-a2c9-0e60d11d9dc8',
+          ...this.skola24CommonHeaders,
+        },
+      }
+    )
+    const preSchoolStudents = await skola24PreSchoolStudentsResponse.json()
+
+    const preSchool = (preSchoolStudents.data.privateStudents as [])
+      .map((student: any) => {
+        return {
+          name: student.name,
+          guid: student.guid,
+          preschoolUnitGuid: student.preschoolUnitGuid,
+          preschoolUnitName: student.preschoolUnitName,
+          preSchoolGuid: preSchoolGuid,
+        }
+      })
+      .find(
+        (student: any) =>
+          student.name === child.firstName + ' ' + child.lastName
+      )
+
+    if (preSchool) {
+      const firstDayOfWeek = DateTime.fromObject({
+        weekYear: year,
+        weekNumber: week,
+        weekday: 1,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await this.getTimeframeTable(
+          preSchool,
+          firstDayOfWeek.plus({ days: i }),
+          lessonInfo
+        )
+      }
     }
 
-    return timetable.data.lessonInfo
-      .map((lesson: any) => {
-        return {
-          id: lesson.guidId,
-          teacher: lesson.texts[1],
-          location: lesson.texts[2],
-          timeStart: lesson.timeStart,
-          timeEnd: lesson.timeEnd,
-          dayOfWeek: lesson.dayOfWeekNumber,
-          name: lesson.texts[0],
-          dateStart: DateTime.fromObject({
-            weekYear: year,
-            weekNumber: week,
-            weekday: lesson.dayOfWeekNumber,
-          }).toISODate(),
-          dateEnd: DateTime.fromObject({
-            weekYear: year,
-            weekNumber: week,
-            weekday: lesson.dayOfWeekNumber,
-          }).toISODate(),
-        }
-      })
-      .sort((a: TimetableEntry, b: TimetableEntry) => {
-        if (a.dayOfWeek === b.dayOfWeek) {
-          return a.timeStart < b.timeStart ? -1 : 1
-        } else {
-          return a.dayOfWeek < b.dayOfWeek ? -1 : 1
-        }
-      })
+    return lessonInfo.sort((a: TimetableEntry, b: TimetableEntry) => {
+      if (a.dayOfWeek === b.dayOfWeek) {
+        return a.timeStart < b.timeStart ? -1 : 1
+      } else {
+        return a.dayOfWeek < b.dayOfWeek ? -1 : 1
+      }
+    })
+  }
+
+  private async getTimeframeTable(
+    preSchool: any,
+    dateFrom: DateTime,
+    lessonInfo: any[]
+  ) {
+    const timeFramesResponse = await this.fetch(
+      'skola24-timeframes',
+      this.routes.skola24Timeframes,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          dateFrom: dateFrom.toISODate(),
+          preschoolUnitGuid: preSchool.preschoolUnitGuid,
+          schoolGuid: preSchool.preSchoolGuid,
+          studentPersonGuid: preSchool.guid,
+        }),
+        headers: {
+          referrer:
+            'https://web.skola24.se/portal/start/timetable/timetable-exception',
+          'x-scope': '47b9ccc3-3b42-4c45-a2c9-0e60d11d9dc8',
+          ...this.skola24CommonHeaders,
+        },
+      }
+    )
+
+    const timeFrames = await timeFramesResponse.json()
+    const timetable = timeFrames.data.timetable
+
+    if (timetable.timetableTimes.length === 0) {
+      return
+    }
+
+    const timeFrameTable = {
+      id: 'skola24_timeframes',
+      teacher: '',
+      location: preSchool.preschoolUnitName,
+      timeStart: DateTime.fromFormat(
+        timetable.exceptionTimes.length > 0
+          ? timetable.exceptionTimes[0].start
+          : timetable.timetableTimes[0].start,
+        'HH:mm'
+      ).toISOTime(),
+      timeEnd: DateTime.fromFormat(
+        timetable.exceptionTimes.length > 0
+          ? timetable.exceptionTimes[0].stop
+          : timetable.timetableTimes[0].stop,
+        'HH:mm'
+      ).toISOTime(),
+      dayOfWeek: dateFrom.weekday,
+      name:
+        'Vistelsetid' +
+        (timetable.exceptionDayComment ? ' (tillfälligt ändrad)' : ''),
+      dateStart: dateFrom.toISODate(),
+      dateEnd: dateFrom.toISODate(),
+    }
+
+    lessonInfo.push(timeFrameTable)
   }
 
   private skola24CommonHeaders = {
