@@ -102,7 +102,7 @@ export class Skola24Service {
 
     if (!this.isAuthenticated) {
       await this.authenticate()
-      throw new Error('Server Error - Session has expired')
+      this.isAuthenticated = true
     }
 
     const timetablesResponse = await this.fetch(

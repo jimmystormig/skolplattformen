@@ -56,7 +56,7 @@ export class UnikumService {
 
     if (!this.isAuthenticated) {
       await this.authenticate()
-      throw new Error('Server Error - Session has expired')
+      this.isAuthenticated = true
     }
 
     const unikumStartResponse = await this.fetch(
@@ -95,7 +95,7 @@ export class UnikumService {
 
     if (!this.isAuthenticated) {
       await this.authenticate()
-      throw new Error('Server Error - Session has expired')
+      this.isAuthenticated = true
     }
 
     const unikumStartResponse = await this.fetch(
