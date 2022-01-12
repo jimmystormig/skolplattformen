@@ -5,6 +5,8 @@ import { Fetcher, Skola24Child, TimetableEntry } from '@skolplattformen/api'
 import { extractSamlAuthResponseForm } from './common'
 export class Skola24Service {
   log: (...data: any[]) => void = () => {}
+  public isAuthenticated: boolean = false
+
   private fetch: Fetcher
   private routes = {
     skola24: 'https://idp.alingsas.se/skolfed/skola24',
@@ -19,6 +21,7 @@ export class Skola24Service {
     skola24Timeframes:
       'https://web.skola24.se/api/get/timetable/day/with/timeframes/day',
   }
+
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[skola24-service]', ...data)
@@ -90,29 +93,18 @@ export class Skola24Service {
         },
       }
     )
+    this.isAuthenticated = true
     this.log('Authenticated')
-  }
-
-  async isAuthenticated() {
-    this.log('isAuthenticated')
-    let children = await this.getChildren()
-
-    if (children.length === 0) {
-      this.log('Not authenticated, trying to authenticate')
-      await this.authenticate()
-      children = await this.getChildren()
-    }
-
-    if (children.length === 0) {
-      this.log('Still not authenticated, giving up')
-      return false
-    }
-
-    return true
   }
 
   async getChildren(): Promise<Skola24Child[]> {
     this.log('getChildren')
+
+    if (!this.isAuthenticated) {
+      await this.authenticate()
+      throw new Error('Server Error - Session has expired')
+    }
+
     const timetablesResponse = await this.fetch(
       'skola24-timetables',
       this.routes.skola24Timetables,
@@ -131,10 +123,18 @@ export class Skola24Service {
       }
     )
     const timetables = await timetablesResponse?.json()
-    timetables.data.getPersonalTimetablesResponse.childrenTimetables
-    return (
-      timetables.data.getPersonalTimetablesResponse.childrenTimetables || []
-    )
+
+    const children =
+      timetables.data.getPersonalTimetablesResponse.childrenTimetables
+
+    if (!children || children.length === 0) {
+      this.isAuthenticated = false
+      throw new Error('Server Error - Session has expired')
+    }
+
+    this.isAuthenticated = true
+
+    return children
   }
 
   async getTimetable(

@@ -86,9 +86,9 @@ export class ApiArena extends EventEmitter implements Api {
 
     const [arenaIsAuthenticatd, skola24IsAuthenticated, unikumIsAuthenticated] =
       await Promise.all([
-        this.isAuthenticated(),
-        this.skola24Service.isAuthenticated(),
-        this.unikumService.isAuthenticated(),
+        this.arenaService.isAuthenticated,
+        this.skola24Service.isAuthenticated,
+        this.unikumService.isAuthenticated,
       ])
     if (
       !arenaIsAuthenticatd ||
@@ -109,29 +109,7 @@ export class ApiArena extends EventEmitter implements Api {
     }
   }
 
-  getUser = async () => {
-    const user = await this.arenaService.getUser()
-
-    if (user.isAuthenticated) {
-      this.log('User is authenticated, checking other services')
-      const [skola24IsAuthenticated, unikumIsAuthenticated] = await Promise.all(
-        [
-          this.skola24Service.isAuthenticated(),
-          this.unikumService.isAuthenticated(),
-        ]
-      )
-      if (!skola24IsAuthenticated || !unikumIsAuthenticated) {
-        this.log(
-          `User is authenticated but not authenticated in other services (skola24: ${skola24IsAuthenticated}, unikum: ${unikumIsAuthenticated})`
-        )
-        return { isauthenticated: false } as User
-      }
-    } else {
-      this.log('User is not authenticated')
-    }
-
-    return user
-  }
+  getUser = async () => await this.arenaService.getUser()
 
   getChildren = async () =>
     (await this.getSkola24Children()).map((child) => {
@@ -147,19 +125,21 @@ export class ApiArena extends EventEmitter implements Api {
     this.alingsasService.getCalendar(child)
 
   getClassmates = async (child: EtjanstChild) =>
-    await (
-      await this.unikumService.getClassPeople(child, 'elever')
-    ).map((classmate) => {
-      return {
-        firstname: classmate.firstname,
-        lastname: classmate.lastname,
-        className: classmate.className,
-        guardians: [],
-        sisId: '',
+    (await this.unikumService.getClassPeople(child, 'elever')).map(
+      (classmate) => {
+        return {
+          firstname: classmate.firstname,
+          lastname: classmate.lastname,
+          className: classmate.className,
+          guardians: [],
+          sisId: '',
+        }
       }
-    })
+    )
 
-  getNews = async (child: EtjanstChild) => this.arenaService.getNews(child)
+  getNews = async (child: EtjanstChild) => {
+    return await this.arenaService.getNews(child)
+  }
 
   getNewsDetails = async (_: EtjanstChild, item: NewsItem) => {
     return { ...item }
@@ -213,10 +193,12 @@ export class ApiArena extends EventEmitter implements Api {
     this.emit('logout')
   }
 
+  /*
   async isAuthenticated() {
     const user = await this.getUser()
     return user.isAuthenticated
   }
+  */
 
   private async fakeMode(): Promise<LoginStatusChecker> {
     this.isFake = true

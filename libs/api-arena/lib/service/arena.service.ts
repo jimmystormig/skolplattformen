@@ -7,11 +7,14 @@ import {
   Fetcher,
   LoginStatusChecker,
   NewsItem,
+  Response,
+  User,
 } from '@skolplattformen/api'
 import { DummyStatusChecker } from '../dummyStatusChecker'
 import { getBaseUrl } from './common'
 
 export class ArenaService {
+  public isAuthenticated = false
   static arenaStart = 'https://arena.alingsas.se'
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
@@ -39,6 +42,7 @@ export class ArenaService {
     const startpageResponseUrl = await this.getStartpgageUrl()
 
     if (this.isStartpage(startpageResponseUrl)) {
+      this.isAuthenticated = true
       this.log('Already authenticated')
       return ArenaService.emitOk()
     }
@@ -51,6 +55,7 @@ export class ArenaService {
     const status = new ArenaStatusChecker(this, authTicket.landingPageBaseUrl)
 
     status.on('OK', async () => {
+      this.isAuthenticated = true
       this.log('Authenticated')
     })
     status.on('PENDING', () => {
@@ -91,13 +96,19 @@ export class ArenaService {
   async getUser() {
     this.log('getUser')
 
+    if (!this.isAuthenticated) {
+      return { isAuthenticated: false } as User
+    }
+
     let userPageResponse = await this.fetch(
       'arena-current-user',
       this.routes.currentUser
     )
     if (userPageResponse.status !== 200) {
+      this.isAuthenticated = false
       return { isAuthenticated: false }
     }
+    this.isAuthenticated = true
 
     var body = await userPageResponse.text()
 
@@ -118,14 +129,26 @@ export class ArenaService {
       firstName: firstName,
       lastName: lastName,
       email: email,
-    }
+    } as User
   }
 
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
     this.log('getNews')
-    const response = await this.fetch('current-user', ArenaService.arenaStart)
 
-    const baseUrl = getBaseUrl((response as any).url)
+    if (!this.isAuthenticated) {
+      throw new Error('Server Error - Session has expired')
+    }
+
+    const response = await this.fetch('current-user', ArenaService.arenaStart)
+    const responseUrl = (response as any).url as string
+
+    if (!ArenaService.isAuthenticated(response)) {
+      this.isAuthenticated = false
+      return []
+    }
+    this.isAuthenticated = true
+
+    const baseUrl = getBaseUrl(responseUrl)
     let body = await response.text()
 
     body = await this.handleCustiodian(body, baseUrl)
@@ -382,6 +405,9 @@ export class ArenaService {
     }, 50)
     return emitter as ArenaStatusChecker
   }
+
+  private static isAuthenticated = (startResponse: Response) =>
+    (startResponse as any).url.indexOf('/wa/chooseAuthmech') === -1
 }
 
 export class ArenaStatusChecker
