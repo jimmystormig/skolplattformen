@@ -18,7 +18,7 @@ import { DummyStatusChecker } from './dummyStatusChecker'
 import { AlingsasService } from './service/alingsas.service'
 import { ArenaService } from './service/arena.service'
 import { Skola24Service } from './service/skola24.service'
-import { SkolmatenService } from './service/skolmaten.service'
+import { SodexoService } from './service/sodexo.service'
 import { UnikumService } from './service/unikum.service'
 
 export class ApiArena extends EventEmitter implements Api {
@@ -28,7 +28,7 @@ export class ApiArena extends EventEmitter implements Api {
   private arenaService: ArenaService
   private skola24Service: Skola24Service
   private unikumService: UnikumService
-  private skolmatenService: SkolmatenService
+  private sodexoService: SodexoService
   private alingsasService: AlingsasService
   isFake = false
   isLoggedIn = false
@@ -44,7 +44,7 @@ export class ApiArena extends EventEmitter implements Api {
     this.arenaService = new ArenaService(this.fetch, this.log)
     this.skola24Service = new Skola24Service(this.fetch, this.log)
     this.unikumService = new UnikumService(this.fetch, this.log)
-    this.skolmatenService = new SkolmatenService(this.fetch, this.log)
+    this.sodexoService = new SodexoService(this.fetch, this.log)
     this.alingsasService = new AlingsasService(this.fetch, this.log)
   }
 
@@ -84,18 +84,32 @@ export class ApiArena extends EventEmitter implements Api {
     console.log('setSessionCookie', sessionCookie)
     this.cookieManager.setCookieString(sessionCookie, ArenaService.arenaStart)
 
-    const [arenaIsAuthenticatd, skola24IsAuthenticated, unikumIsAuthenticated] =
-      await Promise.all([
-        this.arenaService.isAuthenticated,
-        this.skola24Service.isAuthenticated,
-        this.unikumService.isAuthenticated,
-      ])
+    await this.arenaService.authenticate()
+
+    await Promise.all([
+      this.skola24Service.authenticate(),
+      this.unikumService.authenticate(),
+    ])
+
+    const arenaIsAuthenticatd = this.arenaService.isAuthenticated
+    const skola24IsAuthenticated = this.skola24Service.isAuthenticated
+    const unikumIsAuthenticated = this.unikumService.isAuthenticated
+
+    this.log(
+      'Authenticated',
+      arenaIsAuthenticatd,
+      skola24IsAuthenticated,
+      unikumIsAuthenticated
+    )
+
     if (
       !arenaIsAuthenticatd ||
       !skola24IsAuthenticated ||
       !unikumIsAuthenticated
     ) {
-      throw new Error('Session cookies has expired')
+      throw new Error(
+        `Some services are not authenticated (Arena: ${arenaIsAuthenticatd}, Skola24: ${skola24IsAuthenticated}, Unikum: ${unikumIsAuthenticated}`
+      )
       // TODO Should we logout?
     }
 
@@ -137,7 +151,7 @@ export class ApiArena extends EventEmitter implements Api {
     return { ...item }
   }
 
-  getMenu = (child: EtjanstChild) => this.skolmatenService.getMenu(child)
+  getMenu = (child: EtjanstChild) => this.sodexoService.getMenu(child)
 
   getNotifications = (child: EtjanstChild) =>
     this.unikumService.getNotifications(child)

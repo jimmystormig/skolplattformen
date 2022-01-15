@@ -7,4 +7,5 @@ export class DummyStatusChecker
 {
   token = ''
   async cancel(): Promise<void> {}
+  async check(): Promise<void> {}
 }

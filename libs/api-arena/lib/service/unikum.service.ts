@@ -34,6 +34,11 @@ export class UnikumService {
   async authenticate(): Promise<void> {
     this.log('Authenticating...')
     const unikumResponse = await this.fetch('unikum', this.routes.unikumSso)
+
+    if (!UnikumService.isAuthenticated(unikumResponse)) {
+      return
+    }
+
     const unikumResponseText = await unikumResponse.text()
     const samlForm = extractSamlAuthResponseForm(unikumResponseText)
     await this.fetch('saml-login', samlForm.action, {
@@ -139,8 +144,13 @@ export class UnikumService {
     )
   }
 
-  private static isAuthenticated = (startResponse: Response) =>
-    (startResponse as any).url.indexOf('login.jsp') === -1
+  private static isAuthenticated = (startResponse: Response) => {
+    const url = (startResponse as any).url
+    return (
+      url.indexOf('login.jsp') === -1 &&
+      url.indexOf('/wa/chooseAuthmech') === -1
+    )
+  }
 
   private static scrapeNotificationsGuardianId(
     body: string,

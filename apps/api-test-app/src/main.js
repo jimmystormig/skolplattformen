@@ -120,7 +120,6 @@ async function run() {
       } catch (error) {
         console.error(error)
       }
-      */
 
       console.log('news')
       const news = await api.getNews(children[0])
@@ -136,7 +135,6 @@ async function run() {
       )
       console.log(newsItems)
 
-      /*
       console.log('menu')
       const menu = await api.getMenu(children[0])
       console.log(menu)
@@ -177,6 +175,7 @@ async function Login(api) {
       'Could not login with old session cookie. Reverting to BankId',
       error
     )
+    await cookieJar.removeAllCookies()
   }
 
   if (useBankId) {

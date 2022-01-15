@@ -1,7 +1,12 @@
 import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { DateTime } from 'luxon'
-import { Fetcher, Skola24Child, TimetableEntry } from '@skolplattformen/api'
+import {
+  Fetcher,
+  Skola24Child,
+  TimetableEntry,
+  Response,
+} from '@skolplattformen/api'
 import { extractSamlAuthResponseForm } from './common'
 export class Skola24Service {
   log: (...data: any[]) => void = () => {}
@@ -70,6 +75,11 @@ export class Skola24Service {
         },
       }
     )
+
+    if (!Skola24Service.isAuthenticated(alingsasSamlAuthRequestResponse)) {
+      return
+    }
+
     const alingsasSamlAuthRequestResponseText =
       await alingsasSamlAuthRequestResponse.text()
     const alingsasSamlAuthResponseForm = extractSamlAuthResponseForm(
@@ -228,6 +238,7 @@ export class Skola24Service {
             timeEnd: lesson.timeEnd,
             dayOfWeek: lesson.dayOfWeekNumber,
             name: lesson.texts[0],
+            code: lesson.texts[0].toUpperCase(),
             dateStart: DateTime.fromObject({
               weekYear: year,
               weekNumber: week,
@@ -426,4 +437,7 @@ export class Skola24Service {
       samlRequest,
     }
   }
+
+  private static isAuthenticated = (startResponse: Response) =>
+    (startResponse as any).url.indexOf('/wa/chooseAuthmech') === -1
 }
