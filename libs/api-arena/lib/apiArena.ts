@@ -111,15 +111,7 @@ export class ApiArena extends EventEmitter implements Api {
 
   getUser = async () => await this.arenaService.getUser()
 
-  getChildren = async () =>
-    (await this.getSkola24Children()).map((child) => {
-      return {
-        id: child.personGuid as string,
-        name: `${child.firstName} ${child.lastName}`,
-        schoolId: child.schoolID,
-        sdsId: '',
-      }
-    })
+  getChildren = async () => await this.arenaService.getChildren()
 
   getCalendar = async (child: EtjanstChild) =>
     this.alingsasService.getCalendar(child)

@@ -132,6 +132,40 @@ export class ArenaService {
     } as User
   }
 
+  async getChildren(): Promise<EtjanstChild[]> {
+    this.log('getChildren')
+
+    if (!this.isAuthenticated) {
+      throw new Error('Server Error - Session has expired')
+    }
+
+    const response = await this.fetch('arena-start', ArenaService.arenaStart)
+    const responseUrl = (response as any).url as string
+
+    if (!ArenaService.isAuthenticated(response)) {
+      this.isAuthenticated = false
+      return []
+    }
+    this.isAuthenticated = true
+
+    const baseUrl = getBaseUrl(responseUrl)
+    let body = await response.text()
+
+    body = await this.handleCustiodian(body, baseUrl)
+
+    const doc = html.parse(decode(body))
+    return doc
+      .querySelectorAll('.children .child .child-block h2')
+      .map((child) => child.rawText)
+      .map((child) => {
+        return {
+          id: child.toLocaleLowerCase().replace(/\s/g, ''),
+          name: child,
+          sdsId: '',
+        }
+      })
+  }
+
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
     this.log('getNews')
 
@@ -139,7 +173,7 @@ export class ArenaService {
       throw new Error('Server Error - Session has expired')
     }
 
-    const response = await this.fetch('current-user', ArenaService.arenaStart)
+    const response = await this.fetch('arena-start', ArenaService.arenaStart)
     const responseUrl = (response as any).url as string
 
     if (!ArenaService.isAuthenticated(response)) {
