@@ -9,7 +9,6 @@ import {
 import { extractSamlAuthResponseForm, getBaseUrl } from './common'
 
 export class UnikumService {
-  public isAuthenticated: boolean = false
   log: (...data: any[]) => void = () => {}
 
   private fetch: Fetcher
@@ -49,8 +48,24 @@ export class UnikumService {
         samlForm.samlResponse
       )}&RelayState=${encodeURIComponent(samlForm.relayState)}`,
     })
-    this.isAuthenticated = true
     this.log('Authenticated')
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    this.log('isAuthenticated?')
+
+    const unikumStartResponse = await this.fetch(
+      'unikum-start',
+      this.routes.unikumStart
+    )
+
+    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
+      this.log('Not authenticated')
+      return false
+    }
+
+    this.log('Authenticated')
+    return true
   }
 
   async getClassPeople(
@@ -59,21 +74,10 @@ export class UnikumService {
   ): Promise<{ firstname: string; lastname: string; className: string }[]> {
     this.log('getClassPeople')
 
-    if (!this.isAuthenticated) {
-      await this.authenticate()
-      this.isAuthenticated = true
-    }
-
     const unikumStartResponse = await this.fetch(
       'unikum-start',
       this.routes.unikumStart
     )
-
-    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      this.isAuthenticated = false
-      throw new Error('Server Error - Session has expired')
-    }
-    this.isAuthenticated = true
 
     const unikumResponseText = await unikumStartResponse.text()
     const unikumBaseUrl = getBaseUrl((unikumStartResponse as any).url)
@@ -98,21 +102,10 @@ export class UnikumService {
   async getNotifications(child: EtjanstChild): Promise<Notification[]> {
     this.log('getNotifications')
 
-    if (!this.isAuthenticated) {
-      await this.authenticate()
-      this.isAuthenticated = true
-    }
-
     const unikumStartResponse = await this.fetch(
       'unikum-start',
       this.routes.unikumStart
     )
-
-    if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      this.isAuthenticated = false
-      throw new Error('Server Error - Session has expired')
-    }
-    this.isAuthenticated = true
 
     const unikumStartResponseUrl = (unikumStartResponse as any).url
     const unikumBaseUrl = getBaseUrl(unikumStartResponseUrl)

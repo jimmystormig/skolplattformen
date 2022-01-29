@@ -91,28 +91,6 @@ export class ApiArena extends EventEmitter implements Api {
       this.unikumService.authenticate(),
     ])
 
-    const arenaIsAuthenticatd = this.arenaService.isAuthenticated
-    const skola24IsAuthenticated = this.skola24Service.isAuthenticated
-    const unikumIsAuthenticated = this.unikumService.isAuthenticated
-
-    this.log(
-      'Authenticated',
-      arenaIsAuthenticatd,
-      skola24IsAuthenticated,
-      unikumIsAuthenticated
-    )
-
-    if (
-      !arenaIsAuthenticatd ||
-      !skola24IsAuthenticated ||
-      !unikumIsAuthenticated
-    ) {
-      throw new Error(
-        `Some services are not authenticated (Arena: ${arenaIsAuthenticatd}, Skola24: ${skola24IsAuthenticated}, Unikum: ${unikumIsAuthenticated}`
-      )
-      // TODO Should we logout?
-    }
-
     this.isLoggedIn = true
     this.emit('login')
   }
@@ -123,7 +101,18 @@ export class ApiArena extends EventEmitter implements Api {
     }
   }
 
-  getUser = async () => await this.arenaService.getUser()
+  async getUser() {
+    const areAllAuthenticated = await Promise.all([
+      this.skola24Service.isAuthenticated(),
+      this.unikumService.isAuthenticated(),
+    ])
+
+    if (!areAllAuthenticated[0] || !areAllAuthenticated[1]) {
+      return { isAuthenticated: false } as User
+    }
+
+    return await this.arenaService.getUser()
+  }
 
   getChildren = async () => await this.arenaService.getChildren()
 
@@ -198,13 +187,6 @@ export class ApiArena extends EventEmitter implements Api {
     this.cookieManager.clearAll()
     this.emit('logout')
   }
-
-  /*
-  async isAuthenticated() {
-    const user = await this.getUser()
-    return user.isAuthenticated
-  }
-  */
 
   private async fakeMode(): Promise<LoginStatusChecker> {
     this.isFake = true

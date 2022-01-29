@@ -14,7 +14,6 @@ import { DummyStatusChecker } from '../dummyStatusChecker'
 import { getBaseUrl } from './common'
 
 export class ArenaService {
-  public isAuthenticated = false
   static arenaStart = 'https://arena.alingsas.se'
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
@@ -42,7 +41,6 @@ export class ArenaService {
     const startpageResponseUrl = await this.getStartpgageUrl()
 
     if (this.isStartpage(startpageResponseUrl)) {
-      this.isAuthenticated = true
       this.log('Already authenticated')
       return ArenaService.emitOk()
     }
@@ -55,7 +53,6 @@ export class ArenaService {
     const status = new ArenaStatusChecker(this, authTicket.landingPageBaseUrl)
 
     status.on('OK', async () => {
-      this.isAuthenticated = true
       this.log('Authenticated')
     })
     status.on('PENDING', () => {
@@ -94,21 +91,16 @@ export class ArenaService {
   }
 
   async getUser() {
-    this.log('getUser')
-
-    if (!this.isAuthenticated) {
-      return { isAuthenticated: false } as User
-    }
+    this.log('getUser/isAuthenticated?')
 
     let userPageResponse = await this.fetch(
       'arena-current-user',
       this.routes.currentUser
     )
     if (userPageResponse.status !== 200) {
-      this.isAuthenticated = false
+      this.log('Not authenticated')
       return { isAuthenticated: false }
     }
-    this.isAuthenticated = true
 
     var body = await userPageResponse.text()
 
@@ -124,6 +116,7 @@ export class ArenaService {
       '.field-name-field-user-email .field-item'
     ).rawText
 
+    this.log('Authenticated')
     return {
       isAuthenticated: true,
       firstName: firstName,
@@ -135,18 +128,12 @@ export class ArenaService {
   async getChildren(): Promise<EtjanstChild[]> {
     this.log('getChildren')
 
-    if (!this.isAuthenticated) {
-      throw new Error('Server Error - Session has expired')
-    }
-
     const response = await this.fetch('arena-start', ArenaService.arenaStart)
     const responseUrl = (response as any).url as string
 
     if (!ArenaService.isAuthenticated(response)) {
-      this.isAuthenticated = false
       return []
     }
-    this.isAuthenticated = true
 
     const baseUrl = getBaseUrl(responseUrl)
     let body = await response.text()
@@ -169,18 +156,12 @@ export class ArenaService {
   async getNews(child: EtjanstChild): Promise<NewsItem[]> {
     this.log('getNews')
 
-    if (!this.isAuthenticated) {
-      throw new Error('Server Error - Session has expired')
-    }
-
     const response = await this.fetch('arena-start', ArenaService.arenaStart)
     const responseUrl = (response as any).url as string
 
     if (!ArenaService.isAuthenticated(response)) {
-      this.isAuthenticated = false
       return []
     }
-    this.isAuthenticated = true
 
     const baseUrl = getBaseUrl(responseUrl)
     let body = await response.text()

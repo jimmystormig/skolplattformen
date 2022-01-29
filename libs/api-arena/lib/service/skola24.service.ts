@@ -10,7 +10,6 @@ import {
 import { extractSamlAuthResponseForm } from './common'
 export class Skola24Service {
   log: (...data: any[]) => void = () => {}
-  public isAuthenticated: boolean = false
 
   private fetch: Fetcher
   private routes = {
@@ -103,17 +102,24 @@ export class Skola24Service {
         },
       }
     )
-    this.isAuthenticated = true
     this.log('Authenticated')
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    this.log('isAuthenticated?')
+    const children = await this.getChildren()
+
+    if (!children || children.length === 0) {
+      this.log('Not authenticated')
+      return false
+    }
+
+    this.log('Authenticated')
+    return true
   }
 
   async getChildren(): Promise<Skola24Child[]> {
     this.log('getChildren')
-
-    if (!this.isAuthenticated) {
-      await this.authenticate()
-      this.isAuthenticated = true
-    }
 
     const timetablesResponse = await this.fetch(
       'skola24-timetables',
@@ -134,17 +140,7 @@ export class Skola24Service {
     )
     const timetables = await timetablesResponse?.json()
 
-    const children =
-      timetables.data.getPersonalTimetablesResponse.childrenTimetables
-
-    if (!children || children.length === 0) {
-      this.isAuthenticated = false
-      throw new Error('Server Error - Session has expired')
-    }
-
-    this.isAuthenticated = true
-
-    return children
+    return timetables.data.getPersonalTimetablesResponse.childrenTimetables
   }
 
   async getTimetable(
