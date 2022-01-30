@@ -107,13 +107,16 @@ export class Skola24Service {
 
   async isAuthenticated(): Promise<boolean> {
     this.log('isAuthenticated?')
-    const children = await this.getChildren()
-
+    let children = await this.getChildren()
     if (!children || children.length === 0) {
-      this.log('Not authenticated')
-      return false
+      this.log('Not authenticated, trying to reauthenticate')
+      await this.authenticate()
+      children = await this.getChildren()
+      if (!children || children.length === 0) {
+        this.log('Still not authenticated, giving up')
+        return false
+      }
     }
-
     this.log('Authenticated')
     return true
   }

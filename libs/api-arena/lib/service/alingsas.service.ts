@@ -29,7 +29,7 @@ export class AlingsasService {
       filterableEndDate: any
     }
 
-    const today = DateTime.local({ zone: 'Europe/Stockholm' })
+    const today = DateTime.local()
     const inAYear = today.plus({ years: 1 })
     const items: CalendarItemExtended[] = []
 
@@ -86,9 +86,9 @@ export class AlingsasService {
           items.push({
             id: AlingsasService.hashCode(title) + date.toMillis(),
             title: title,
-            startDate: date.toISODate(),
+            startDate: date.toISO(),
             filterableStartDate: date,
-            endDate: endDate.toISODate(),
+            endDate: endDate.toISO(),
             filterableEndDate: endDate,
             allDay: true,
           })
@@ -115,9 +115,9 @@ export class AlingsasService {
           items.push({
             id: AlingsasService.hashCode(item) + date.toMillis(),
             title: item,
-            startDate: date.toISODate(),
+            startDate: date.toISO(),
             filterableStartDate: date,
-            endDate: date.toISODate(),
+            endDate: date.plus({ days: 1 }).toISO(),
             filterableEndDate: date,
             allDay: true,
           })
@@ -140,9 +140,9 @@ export class AlingsasService {
           items.push({
             id: AlingsasService.hashCode(item) + date.toMillis(),
             title: item,
-            startDate: date.toISODate(),
+            startDate: date.toISO(),
             filterableStartDate: date,
-            endDate: date.toISODate(),
+            endDate: date.plus({ days: 1 }).toISO(),
             filterableEndDate: date,
             allDay: true,
           })
@@ -163,9 +163,9 @@ export class AlingsasService {
             items.push({
               id: AlingsasService.hashCode(item) + date.toMillis(),
               title: item,
-              startDate: date.toISODate(),
+              startDate: date.toISO(),
               filterableStartDate: date,
-              endDate: date.toISODate(),
+              endDate: date.plus({ days: 1 }).toISO(),
               filterableEndDate: date,
               allDay: true,
             })
@@ -194,9 +194,9 @@ export class AlingsasService {
               items.push({
                 id: AlingsasService.hashCode(item) + startDate.toMillis(),
                 title: item,
-                startDate: startDate.toISODate(),
+                startDate: startDate.toISO(),
                 filterableStartDate: startDate,
-                endDate: endDate.toISODate(),
+                endDate: endDate.toISO(),
                 filterableEndDate: endDate,
                 allDay: true,
               })
@@ -226,9 +226,9 @@ export class AlingsasService {
               items.push({
                 id: AlingsasService.hashCode(item) + date.toMillis(),
                 title: title,
-                startDate: date.toISODate(),
+                startDate: date.toISO(),
                 filterableStartDate: date,
-                endDate: date.toISODate(),
+                endDate: date.plus({ days: 1 }).toISO(),
                 filterableEndDate: date,
                 allDay: true,
               })
@@ -262,9 +262,9 @@ export class AlingsasService {
             items.push({
               id: AlingsasService.hashCode(item) + date.toMillis(),
               title: item,
-              startDate: date.toISODate(),
+              startDate: date.toISO(),
               filterableStartDate: date,
-              endDate: date.toISODate(),
+              endDate: date.plus({ days: 1 }).toISO(),
               filterableEndDate: date,
               allDay: true,
             })
@@ -288,9 +288,9 @@ export class AlingsasService {
             items.push({
               id: AlingsasService.hashCode(item) + date.toMillis(),
               title: item,
-              startDate: date.toISODate(),
+              startDate: date.toISO(),
               filterableStartDate: date,
-              endDate: date.toISODate(),
+              endDate: date.plus({ days: 1 }).toISO(),
               filterableEndDate: date,
               allDay: true,
             })

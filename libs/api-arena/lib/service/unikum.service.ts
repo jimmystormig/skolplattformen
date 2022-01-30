@@ -53,17 +53,22 @@ export class UnikumService {
 
   async isAuthenticated(): Promise<boolean> {
     this.log('isAuthenticated?')
-
-    const unikumStartResponse = await this.fetch(
+    let unikumStartResponse = await this.fetch(
       'unikum-start',
       this.routes.unikumStart
     )
-
     if (!UnikumService.isAuthenticated(unikumStartResponse)) {
-      this.log('Not authenticated')
-      return false
+      this.log('Not authenticated, trying to reauthenticate')
+      await this.authenticate()
+      unikumStartResponse = await this.fetch(
+        'unikum-start',
+        this.routes.unikumStart
+      )
+      if (!UnikumService.isAuthenticated(unikumStartResponse)) {
+        this.log('Still not authenticated, giving up')
+        return false
+      }
     }
-
     this.log('Authenticated')
     return true
   }

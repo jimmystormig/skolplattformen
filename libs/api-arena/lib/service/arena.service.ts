@@ -9,6 +9,7 @@ import {
   NewsItem,
   Response,
   User,
+  toMarkdown,
 } from '@skolplattformen/api'
 import { DummyStatusChecker } from '../dummyStatusChecker'
 import { getBaseUrl } from './common'
@@ -229,16 +230,10 @@ export class ArenaService {
     var intro = newsBlock.querySelector(
       '.field-name-field-introduction .field-item'
     )?.rawText
-    var body = newsBlock
-      .querySelector('.field-name-body .field-item')
-      ?.innerHTML.replace(/<p>&nbsp;<\/p>\n/g, '')
-      .replace(/<p>|<\/p>/g, '')
-      .replace(/<br>/g, '')
-      .replace(/<a.*?href=["']([^"']*)["'][^>]*>([^<]*)<\/a>/gim, '[$2]($1)')
-      .replace(/<\/?ul>\n/gim, '')
-      .replace(/<li>/gim, '* ')
-      .replace(/<\/li>/gim, '')
-      .replace(/^[ \t]+/gm, '')
+    var rawBody = newsBlock.querySelector(
+      '.field-name-body .field-item'
+    )?.innerHTML
+    var body = toMarkdown(rawBody)
     var attached = newsBlock
       .querySelectorAll('.field-name-field-attached-files .field-item a')
       .map((a) => {
@@ -258,7 +253,7 @@ export class ArenaService {
       (body ? '\n\n' : '') +
       attached
 
-    // Do not set header to keep indication that this news is not read that was set in getNews()
+    // Do not set header here since it's already set in getnew(). This will keep the not read symbol.
     // item.header = header
     item.intro = intro
     item.body = body
