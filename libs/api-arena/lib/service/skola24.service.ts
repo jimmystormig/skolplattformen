@@ -365,7 +365,10 @@ export class Skola24Service {
     const timeFrames = await timeFramesResponse.json()
     const timetable = timeFrames.data.timetable
 
-    if (timetable.timetableTimes.length === 0) {
+    if (
+      timetable.timetableTimes.length === 0 ||
+      timetable.exceptionTimes.length === 0
+    ) {
       return
     }
 
