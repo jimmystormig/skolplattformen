@@ -1,8 +1,9 @@
 import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { EtjanstChild, Fetcher, MenuItem } from '@skolplattformen/api'
+import { IService } from './service.interface'
 
-export class SkolmatenService {
+export class SkolmatenService implements IService {
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
   private routes = {
@@ -12,6 +13,10 @@ export class SkolmatenService {
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[skolmaten-service]', ...data)
+  }
+
+  setFetcher(fetcher: Fetcher): void {
+    this.fetch = fetcher
   }
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {

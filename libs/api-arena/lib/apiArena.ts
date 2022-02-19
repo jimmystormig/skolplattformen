@@ -15,6 +15,7 @@ import {
 import EventEmitter from 'events'
 import { DateTime } from 'luxon'
 import { DummyStatusChecker } from './dummyStatusChecker'
+import { fakeFetcher } from './fake/fakeFetcher'
 import { AlingsasService } from './service/alingsas.service'
 import { ArenaService } from './service/arena.service'
 import { Skola24Service } from './service/skola24.service'
@@ -22,7 +23,7 @@ import { SodexoService } from './service/sodexo.service'
 import { UnikumService } from './service/unikum.service'
 
 export class ApiArena extends EventEmitter implements Api {
-  private fetch: Fetcher
+  private originalFetcher: Fetcher
   private cookieManager: CookieManager
   private personalNumber?: string
   private arenaService: ArenaService
@@ -39,25 +40,23 @@ export class ApiArena extends EventEmitter implements Api {
     options?: FetcherOptions
   ) {
     super()
-    this.fetch = wrap(fetch, options)
+    this.originalFetcher = wrap(fetch, options)
     this.cookieManager = cookieManager
-    this.arenaService = new ArenaService(this.fetch, this.log)
-    this.skola24Service = new Skola24Service(this.fetch, this.log)
-    this.unikumService = new UnikumService(this.fetch, this.log)
-    this.sodexoService = new SodexoService(this.fetch, this.log)
-    this.alingsasService = new AlingsasService(this.fetch, this.log)
-  }
-
-  public replaceFetcher(fetcher: Fetcher) {
-    this.fetch = fetcher
+    this.arenaService = new ArenaService(this.originalFetcher, this.log)
+    this.skola24Service = new Skola24Service(this.originalFetcher, this.log)
+    this.unikumService = new UnikumService(this.originalFetcher, this.log)
+    this.sodexoService = new SodexoService(this.originalFetcher, this.log)
+    this.alingsasService = new AlingsasService(this.originalFetcher, this.log)
   }
 
   getPersonalNumber = () => this.personalNumber
 
   login = async (personalNumber?: string): Promise<LoginStatusChecker> => {
+    this.log('login', personalNumber)
     if (personalNumber !== undefined && personalNumber.endsWith('1212121212'))
       return this.fakeMode()
 
+    this.useOriginalFetcher()
     this.isFake = false
 
     const status = await this.arenaService.authenticate(personalNumber)
@@ -190,6 +189,7 @@ export class ApiArena extends EventEmitter implements Api {
 
   private async fakeMode(): Promise<LoginStatusChecker> {
     this.isFake = true
+    this.useFakeFetcher()
 
     setTimeout(() => {
       this.isLoggedIn = true
@@ -199,6 +199,22 @@ export class ApiArena extends EventEmitter implements Api {
     const emitter = new DummyStatusChecker()
     emitter.token = 'fake'
     return emitter
+  }
+
+  private useFakeFetcher() {
+    this.arenaService.setFetcher(fakeFetcher)
+    this.skola24Service.setFetcher(fakeFetcher)
+    this.unikumService.setFetcher(fakeFetcher)
+    this.sodexoService.setFetcher(fakeFetcher)
+    this.alingsasService.setFetcher(fakeFetcher)
+  }
+
+  private useOriginalFetcher() {
+    this.arenaService.setFetcher(this.originalFetcher)
+    this.skola24Service.setFetcher(this.originalFetcher)
+    this.unikumService.setFetcher(this.originalFetcher)
+    this.sodexoService.setFetcher(this.originalFetcher)
+    this.alingsasService.setFetcher(this.originalFetcher)
   }
 
   private log(...data: any[]) {

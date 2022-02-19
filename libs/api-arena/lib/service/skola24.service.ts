@@ -8,7 +8,8 @@ import {
   Response,
 } from '@skolplattformen/api'
 import { extractSamlAuthResponseForm } from './common'
-export class Skola24Service {
+import { IService } from './service.interface'
+export class Skola24Service implements IService {
   log: (...data: any[]) => void = () => {}
 
   private fetch: Fetcher
@@ -29,6 +30,10 @@ export class Skola24Service {
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[skola24-service]', ...data)
+  }
+
+  setFetcher(fetcher: Fetcher): void {
+    this.fetch = fetcher
   }
 
   async authenticate() {

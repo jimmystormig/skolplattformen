@@ -13,8 +13,9 @@ import {
 } from '@skolplattformen/api'
 import { DummyStatusChecker } from '../dummyStatusChecker'
 import { getBaseUrl } from './common'
+import { IService } from './service.interface'
 
-export class ArenaService {
+export class ArenaService implements IService {
   static arenaStart = 'https://arena.alingsas.se'
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
@@ -34,6 +35,10 @@ export class ArenaService {
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[arena-service]', ...data)
+  }
+
+  setFetcher(fetcher: Fetcher): void {
+    this.fetch = fetcher
   }
 
   async authenticate(personalNumber?: string): Promise<ArenaStatusChecker> {

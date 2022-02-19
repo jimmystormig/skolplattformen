@@ -2,8 +2,9 @@ import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { DateTime } from 'luxon'
 import { EtjanstChild, Fetcher, MenuItem } from '@skolplattformen/api'
+import { IService } from './service.interface'
 
-export class SodexoService {
+export class SodexoService implements IService {
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
   private routes = {
@@ -13,7 +14,11 @@ export class SodexoService {
 
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
-    this.log = (...data) => log('[skolmaten-service]', ...data)
+    this.log = (...data) => log('[sodexo-service]', ...data)
+  }
+
+  setFetcher(fetcher: Fetcher): void {
+    this.fetch = fetcher
   }
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {

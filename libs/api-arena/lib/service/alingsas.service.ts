@@ -2,8 +2,9 @@ import * as html from 'node-html-parser'
 import { decode } from 'he'
 import { DateTime } from 'luxon'
 import { CalendarItem, EtjanstChild, Fetcher } from '@skolplattformen/api'
+import { IService } from './service.interface'
 
-export class AlingsasService {
+export class AlingsasService implements IService {
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
   private routes = {
@@ -14,6 +15,10 @@ export class AlingsasService {
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[alingsas-service]', ...data)
+  }
+
+  setFetcher(fetcher: Fetcher): void {
+    this.fetch = fetcher
   }
 
   async getCalendar(child: EtjanstChild): Promise<CalendarItem[]> {

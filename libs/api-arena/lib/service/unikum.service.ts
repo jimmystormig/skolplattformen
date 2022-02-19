@@ -7,8 +7,9 @@ import {
   Response,
 } from '@skolplattformen/api'
 import { extractSamlAuthResponseForm, getBaseUrl } from './common'
+import { IService } from './service.interface'
 
-export class UnikumService {
+export class UnikumService implements IService {
   log: (...data: any[]) => void = () => {}
 
   private fetch: Fetcher
@@ -28,6 +29,10 @@ export class UnikumService {
   constructor(fetch: Fetcher, log: (...data: any[]) => void) {
     this.fetch = fetch
     this.log = (...data) => log('[unikum-service]', ...data)
+  }
+
+  setFetcher(fetcher: Fetcher): void {
+    this.fetch = fetcher
   }
 
   async authenticate(): Promise<void> {
@@ -88,7 +93,7 @@ export class UnikumService {
     const unikumBaseUrl = getBaseUrl((unikumStartResponse as any).url)
     const urlToChild =
       unikumBaseUrl + UnikumService.scrapeChildUrl(unikumResponseText, child)
-    const childResponse = await this.fetch('child', urlToChild)
+    const childResponse = await this.fetch('unikum-child', urlToChild)
     const childResponseText = await childResponse.text()
     const classUrls = UnikumService.scrapeClassUrls(childResponseText)
     if (classUrls.length === 0) {
@@ -118,7 +123,7 @@ export class UnikumService {
       unikumStartResponseUrl
     )
     const notificationsResponse = await this.fetch(
-      'notifications',
+      'unikum-notifications',
       notificationsUrl
     )
     const notificationsResponseText = await notificationsResponse.text()
@@ -131,7 +136,7 @@ export class UnikumService {
       guardianId
     )
     const guardianNotificationsResponse = await this.fetch(
-      'notifications',
+      'unikum-guardian-notifications',
       guardianNotificationsUrl
     )
     const guardianNotificationsResponseText =
