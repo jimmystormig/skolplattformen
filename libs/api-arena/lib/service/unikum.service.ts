@@ -83,7 +83,6 @@ export class UnikumService implements IService {
     type: 'elever' | 'lärare'
   ): Promise<{ firstname: string; lastname: string; className: string }[]> {
     this.log('getClassPeople')
-
     const unikumStartResponse = await this.fetch(
       'unikum-start',
       this.routes.unikumStart

@@ -23,6 +23,7 @@ export class SodexoService implements IService {
 
   async getMenu(child: EtjanstChild): Promise<MenuItem[]> {
     this.log('getMenu')
+
     const response = await this.fetch('sodexo-start', this.routes.start)
 
     const responseText = await response.text()

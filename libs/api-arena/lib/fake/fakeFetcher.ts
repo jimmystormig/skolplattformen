@@ -1,6 +1,8 @@
 import { Fetcher, Response } from '@skolplattformen/api'
 import { alingsasSchoolyearCalendar } from './alingsas-schoolyear-calendar'
 import { arenaCurrentUser } from './arena-current-user'
+import { arenaNewsDetails1 } from './arena-news-details-1'
+import { arenaNewsDetails2 } from './arena-news-details-2'
 import { arenaStart } from './arena-start'
 import { skola24AlingsasSamlAuth } from './skola24-alingsas-saml-auth'
 import { skola24Login } from './skola24-login'
@@ -17,6 +19,8 @@ import { unikumStart } from './unikum-start'
 const fetchMappings: { [name: string]: () => Response } = {
   'alingsas-schoolyear-calendar': alingsasSchoolyearCalendar,
   'arena-current-user': arenaCurrentUser,
+  'arena-news-details/news/1': arenaNewsDetails1,
+  'arena-news-details/news/2': arenaNewsDetails2,
   'arena-start': arenaStart,
   'sodexo-start': sodexoStart,
   'skola24-alingsas-saml-auth': skola24AlingsasSamlAuth,

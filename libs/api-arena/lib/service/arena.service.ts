@@ -188,8 +188,9 @@ export class ArenaService implements IService {
     linksOfLinks.forEach((links) => {
       links.forEach((link) => {
         const viewed = link.classNames.indexOf('node-viewed') > -1 ? '' : '◉ '
+        const id = link.getAttribute('href')?.replace(baseUrl, '') as string
         news.push({
-          id: link.getAttribute('href') as string,
+          id: id,
           header: viewed + link.text.replace(' »', ''),
           published: '',
         })
@@ -210,7 +211,7 @@ export class ArenaService implements IService {
     }
 
     let custodianResponse = await this.fetch(
-      'current-user-custodian',
+      'arena-current-user-custodian',
       custodianUrl
     )
     return await custodianResponse.text()
@@ -218,7 +219,7 @@ export class ArenaService implements IService {
 
   private async fetchNewsDetails(item: NewsItem) {
     let response = await this.fetch(
-      'current-user',
+      'arena-news-details' + item.id,
       this.routes.arenaNews(item.id)
     )
     const responseText = await response.text()
