@@ -21,7 +21,7 @@ export const arenaStart = () =>
                       <a href="https://arena.alingsas.se/news/1">Vi firar potatisen »</a>
                     </li>
                     <li class="news-and-infoblock-item">
-                      <a class="node-viewed" href="https://arena.alingsas.se/news/2">Extrainstatt lov »</a>
+                      <a class="node-viewed" href="https://arena.alingsas.se/news/2">Extrainsatt lov »</a>
                     </li>
                   </ul>
                 </div>
