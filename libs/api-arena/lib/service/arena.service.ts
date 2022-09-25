@@ -14,6 +14,21 @@ import {
 import { DummyStatusChecker } from '../dummyStatusChecker'
 import { getBaseUrl } from './common'
 import { IService } from './service.interface'
+import { URL, URLSearchParams } from 'url'
+import { url } from 'inspector'
+
+enum PolicyRole {
+  Caregiver = 5,
+}
+
+enum PolicyMethod {
+  BankId = 3,
+}
+
+enum PolicyBankIdMode {
+  OnThisDevice = 'this',
+  OnOtherDevice = 'other',
+}
 
 export class ArenaService implements IService {
   static arenaStart = 'https://arena.alingsas.se'
@@ -26,6 +41,8 @@ export class ArenaService implements IService {
       baseUrl + '/mg-local/auth/ccp11/grp/other/ssn',
     pollStatus: (baseUrl: string) =>
       baseUrl + '/mg-local/auth/ccp11/grp/pollstatus',
+    ssoRedirectorUrl:
+      'https://idp01.alingsas.se/saml/idp/profile/redirectorpost/sso',
     authLoginUrl: 'https://idp1.alingsas.se/wa/auth/saml/',
     samlLoginUrl: 'https://arena.alingsas.se/Shibboleth.sso/SAML2/POST',
     currentUser: 'https://arena.alingsas.se/user',
@@ -44,19 +61,60 @@ export class ArenaService implements IService {
   async authenticate(personalNumber?: string): Promise<ArenaStatusChecker> {
     this.log('Authenticating...')
 
-    const startpageResponseUrl = await this.getStartpgageUrl()
+    const startpageRespons = await this.getStartpgageResponse()
 
-    if (this.isStartpage(startpageResponseUrl)) {
+    if (this.isStartpage((startpageRespons as any).url as string)) {
       this.log('Already authenticated')
       return ArenaService.emitOk()
     }
 
-    const authTicket = await this.generateAuthTicket(
-      startpageResponseUrl,
-      personalNumber
+    const startpageResponseText = await startpageRespons.text()
+    const loginPolicyAuthenticateUrl = await this.choosePolicyRoleAndMethod(
+      startpageResponseText,
+      PolicyRole.Caregiver,
+      PolicyMethod.BankId,
+      PolicyBankIdMode.OnOtherDevice
     )
 
-    const status = new ArenaStatusChecker(this, authTicket.landingPageBaseUrl)
+    // const authTicket = await this.generateAuthTicket('test', personalNumber)
+
+    const authRequest = await this.fetch(
+      'arena-auth-request',
+      loginPolicyAuthenticateUrl,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `ssn=${personalNumber}`,
+      }
+    )
+
+    const parsedLoginPolicyAuthenticateUrl = new URL(loginPolicyAuthenticateUrl)
+    const loginPolicyAuthenticateBaseUrl =
+      parsedLoginPolicyAuthenticateUrl.href.split('?')[0]
+    const loginPolicyAuthenticatePollUrl =
+      loginPolicyAuthenticateBaseUrl +
+      '?' +
+      new URLSearchParams({
+        sessionid:
+          parsedLoginPolicyAuthenticateUrl.searchParams.get('sessionid')!,
+        collect: '1',
+      })
+    const loginPolicyAuthenticateLoginUrl =
+      loginPolicyAuthenticateBaseUrl +
+      '?' +
+      new URLSearchParams({
+        sessionid:
+          parsedLoginPolicyAuthenticateUrl.searchParams.get('sessionid')!,
+      })
+
+    const status = new ArenaStatusChecker(
+      this,
+      loginPolicyAuthenticatePollUrl,
+      loginPolicyAuthenticateLoginUrl
+    )
 
     status.on('OK', async () => {
       this.log('Authenticated')
@@ -71,29 +129,111 @@ export class ArenaService implements IService {
     return status
   }
 
-  async getPollStatus(basePollUrl: string) {
+  async getPollStatus(pollUrl: string, loginUrl: string) {
     this.log('getPollStatus')
     const pollStatusResponse = await this.fetch(
       'arena-bankid-status',
-      this.routes.pollStatus(basePollUrl)
+      pollUrl,
+      //this.routes.pollStatus(basePollUrl)
+      {
+        headers: {
+          //'Content-Type': 'application/x-www-form-urlencoded',
+          Connection: 'keep-alive',
+          'x-requested-with': 'XMLHttpRequest',
+        },
+      }
     )
 
-    const pollStatusResponseJson = await pollStatusResponse.json()
-    const keepPolling = pollStatusResponseJson.infotext !== ''
-    const isError = pollStatusResponseJson.location.indexOf('error') >= 0
+    const pollStatusResponseText = await pollStatusResponse.text()
+    const pollStatusResponseJson = JSON.parse(pollStatusResponseText)
+    const keepPolling = pollStatusResponseJson.response?.status === 'pending'
+    const isError =
+      pollStatusResponseJson.errorCode ||
+      pollStatusResponseJson.response === 'failed'
+
+    if (isError) {
+      this.log('getPollStatus error', pollStatusResponseJson)
+    }
 
     return {
       keepPolling,
       isError,
-      location: pollStatusResponseJson.location,
+      location: loginUrl,
     }
   }
 
-  async login(signatureUrl: string) {
+  async login(loginUrl: string) {
     this.log('login')
-    const authLoginBody = await this.getSigntureAuthBody(signatureUrl)
+
+    const loginResponse = await this.fetch('arena-saml-response', loginUrl, {
+      redirect: 'follow',
+      headers: {
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
+        'upgrade-insecure-requests': '1',
+      },
+    })
+
+    const loginResponseText = await loginResponse.text()
+    const loginResponseDoc = html.parse(decode(loginResponseText))
+    const loginResponseBodyFormAction = loginResponseDoc
+      .querySelector('form')
+      .getAttribute('action')!
+    const loginResponseBodySamlResponse = loginResponseDoc
+      .querySelector('[name="SAMLResponse"]')
+      .getAttribute('value')!
+
+    const acsResponse = await this.fetch(
+      'arena-acs',
+      loginResponseBodyFormAction,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `SAMLResponse=${encodeURIComponent(
+          loginResponseBodySamlResponse
+        )}`,
+      }
+    )
+
+    const acsText = await acsResponse.text()
+    const acsDoc = html.parse(decode(acsText))
+    const acsFormAction = acsDoc.querySelector('form').getAttribute('action')!
+    const acsDummy = acsDoc
+      .querySelector('[name="dummy"]')
+      .getAttribute('value')!
+
+    const acsBaseUrl = new URL((acsResponse as any).url).origin
+
+    const ssoResponse = await this.fetch(
+      'arena-sso',
+      acsBaseUrl + acsFormAction,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `dummy=${encodeURIComponent(acsDummy)}`,
+      }
+    )
+
+    const ssoText = await ssoResponse.text()
+    const ssoDoc = html.parse(decode(ssoText))
+    const ssoFormAction = ssoDoc.querySelector('form').getAttribute('action')
+    const ssoSamlResponse = ssoDoc
+      .querySelector('[name="SAMLResponse"]')
+      .getAttribute('value')
+    const ssoRelayState = ssoDoc
+      .querySelector('[name="RelayState"]')
+      .getAttribute('value')
+
+    //const authLoginBody = await this.getSigntureAuthBody(signatureUrl)
+    /*
     const samlLoginBody = await this.getSamlLoginBody(authLoginBody)
     await this.samlLogin(samlLoginBody)
+    */
   }
 
   async getUser() {
@@ -268,12 +408,12 @@ export class ArenaService implements IService {
     item.fullImageUrl = imageUrl
   }
 
-  private async getStartpgageUrl(): Promise<string> {
+  private async getStartpgageResponse(): Promise<Response> {
     const startpageResponse = await this.fetch(
       'arena-startpage',
       ArenaService.arenaStart
     )
-    return (startpageResponse as any).url as string
+    return startpageResponse
   }
 
   private async generateAuthTicket(
@@ -281,6 +421,22 @@ export class ArenaService implements IService {
     personalNumber?: string
   ): Promise<{ landingPageBaseUrl: string }> {
     this.log('Generating auth ticket')
+
+    const authRedirectResponse = await this.fetch(
+      'arena-auth-redirect',
+      this.routes.authLoginUrl,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    )
+
+    const landingPageBaseUrl = ''
+
+    /*
     const landingPageResponse = await this.fetch(
       'arena-bankid-landingpage',
       this.routes.bankIdLandingPage(getBaseUrl(startpageResponseUrl))
@@ -298,6 +454,8 @@ export class ArenaService implements IService {
         },
       }
     )
+
+    */
     return { landingPageBaseUrl }
   }
 
@@ -310,13 +468,19 @@ export class ArenaService implements IService {
       signatureUrl,
       {
         redirect: 'follow',
+        headers: {
+          'sec-fetch-dest': 'document',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'same-origin',
+          'upgrade-insecure-requests': '1',
+        },
       }
     )
     if (!signatureResponse.ok) {
       throw new Error('Bad signature response')
     }
     const signatureResponseText = await signatureResponse.text()
-    return ArenaService.extractAuthLoginRequestBody(signatureResponseText)
+    //return ArenaService.extractAuthLoginRequestBody(signatureResponseText)
   }
 
   private async getSamlLoginBody(authLoginBody: string) {
@@ -390,6 +554,82 @@ export class ArenaService implements IService {
     )}&RelayState=${encodeURIComponent(RelayStateText || '')}`
   }
 
+  private async choosePolicyRoleAndMethod(
+    policyResponseText: string,
+    role: PolicyRole,
+    method: PolicyMethod,
+    bankIdMode: PolicyBankIdMode
+  ) {
+    const policyResponseDoc = html.parse(decode(policyResponseText))
+    const samlRequest = policyResponseDoc
+      .querySelector('[name="SAMLRequest"]')
+      .getAttribute('value') as string
+    const relayState = policyResponseDoc
+      .querySelector('[name="RelayState"]')
+      .getAttribute('value') as string
+    const formAction = policyResponseDoc
+      .querySelector('form')
+      .getAttribute('action') as string
+
+    const policyRedirectResponse = await this.fetch(
+      'arena-policy-redirect',
+      formAction,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `SAMLRequest=${encodeURIComponent(
+          samlRequest
+        )}&RelayState=${encodeURIComponent(relayState)}`,
+      }
+    )
+
+    const policyChoiceResponse = await this.fetch(
+      'arena-policy-choice',
+      (policyRedirectResponse as any).url,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `choice=${encodeURIComponent(role)}`,
+      }
+    )
+
+    const policyMethodResponse = await this.fetch(
+      'arena-policy-choice',
+      (policyChoiceResponse as any).url,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `choice=${encodeURIComponent(method)}`,
+      }
+    )
+
+    const policyMethodResponseText = await policyMethodResponse.text()
+
+    const matches = policyMethodResponseText.matchAll(
+      /class="selection_button" href="(.*?)"/gm
+    )
+
+    let chosenBankIdSelectionUrl = ''
+    for (const match of matches) {
+      const group = match[1]
+      if (group.indexOf(bankIdMode) > -1) {
+        chosenBankIdSelectionUrl = group
+        break
+      }
+    }
+
+    return chosenBankIdSelectionUrl
+  }
+
   private static extractSAMLLogin(authLoginResponseText: string) {
     const authLoginDoc = html.parse(decode(authLoginResponseText))
     const inputAttrs = authLoginDoc
@@ -431,18 +671,23 @@ export class ArenaStatusChecker
   implements LoginStatusChecker
 {
   private arenaService: ArenaService
-  private basePollUrl: string
+  private pollUrl: string
+  private loginUrl: string
   private cancelled = false
   token = ''
 
-  constructor(arenaService: ArenaService, basePollUrl: string) {
+  constructor(arenaService: ArenaService, pollUrl: string, loginUrl: string) {
     super()
     this.arenaService = arenaService
-    this.basePollUrl = basePollUrl
+    this.pollUrl = pollUrl
+    this.loginUrl = loginUrl
   }
 
   async check(): Promise<void> {
-    const pollStatus = await this.arenaService.getPollStatus(this.basePollUrl)
+    const pollStatus = await this.arenaService.getPollStatus(
+      this.pollUrl,
+      this.loginUrl
+    )
 
     try {
       if (!pollStatus.keepPolling && !pollStatus.isError) {
