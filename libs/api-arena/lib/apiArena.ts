@@ -66,7 +66,7 @@ export class ApiArena extends EventEmitter implements Api {
       this.personalNumber = personalNumber
       await Promise.all([
         this.skola24Service.authenticate(),
-        this.unikumService.authenticate(),
+        //this.unikumService.authenticate(),
       ])
       this.emit('login')
     })

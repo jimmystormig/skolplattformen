@@ -14,7 +14,7 @@ export class UnikumService implements IService {
 
   private fetch: Fetcher
   private routes = {
-    unikumSso: 'https://idp.alingsas.se/skolfed/unikum',
+    unikumSso: 'http://saml01.alingsas.se/skolfed/unikum',
     unikumStart: 'https://start.unikum.net/unikum/start.html',
     unikumNotificationsUrl: (startpageUrl: string) =>
       startpageUrl.replace('start.html', 'notifications/notifications.html') +

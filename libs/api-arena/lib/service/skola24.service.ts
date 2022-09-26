@@ -7,17 +7,21 @@ import {
   TimetableEntry,
   Response,
 } from '@skolplattformen/api'
-import { extractSamlAuthResponseForm } from './common'
+import {
+  extractSamlAuthRequestForm,
+  extractSamlAuthResponseForm,
+  extractSsoDummyForm,
+} from './common'
 import { IService } from './service.interface'
 export class Skola24Service implements IService {
   log: (...data: any[]) => void = () => {}
 
   private fetch: Fetcher
   private routes = {
-    skola24: 'https://idp.alingsas.se/skolfed/skola24',
+    skola24: 'http://saml01.alingsas.se/skolfed/skola24',
     skola24Timetables:
       'https://web.skola24.se/api/services/skola24/get/personal/timetables',
-    skola24Host: 'alingsas-sso.skola24.se',
+    skola24Host: 'alingsas-idp.skola24.se',
     skola24TimetableKey: 'https://web.skola24.se/api/get/timetable/render/key',
     skola24Timetable: 'https://web.skola24.se/api/render/timetable',
     skola24PreSchools: 'https://web.skola24.se/api/get/preschools',
@@ -40,12 +44,23 @@ export class Skola24Service implements IService {
     this.log('Authenticating...')
     const skola24Response = await this.fetch(
       'skola24-start',
-      this.routes.skola24
+      this.routes.skola24,
+      {
+        redirect: 'follow',
+      }
     )
+
     const skola24ResponseText = await skola24Response.text()
+    const skola24ResponseDoc = html.parse(decode(skola24ResponseText))
+    const ssoLoginUrl = skola24ResponseDoc
+      .querySelector('iframe')
+      .getAttribute('src')
+    /*
     const ssoLoginUrl = await Skola24Service.extractFrameSource(
       skola24ResponseText
     )
+    */
+
     const skola24LoginResponse = await this.fetch(
       'skola24-login',
       (skola24Response as any).url + ssoLoginUrl
@@ -54,10 +69,12 @@ export class Skola24Service implements IService {
     const skola24LoginNovaSsoUrl = Skola24Service.extractLoginNovaSsoUrl(
       skola24LoginResponseText
     )
+
     const skola24LoginNovaSsoResponse = await this.fetch(
       'skola24-login-nova-sso',
       skola24LoginNovaSsoUrl as string
     )
+
     const skola24LoginNovaSsoResponseText =
       await skola24LoginNovaSsoResponse.text()
     const alingsasSamlAuthForm =
@@ -80,33 +97,96 @@ export class Skola24Service implements IService {
       }
     )
 
+    /*
     if (!Skola24Service.isAuthenticated(alingsasSamlAuthRequestResponse)) {
       return
     }
+    */
 
     const alingsasSamlAuthRequestResponseText =
       await alingsasSamlAuthRequestResponse.text()
-    const alingsasSamlAuthResponseForm = extractSamlAuthResponseForm(
+    const alingsasSamlAuthResponseForm = extractSamlAuthRequestForm(
       alingsasSamlAuthRequestResponseText
     )
-    await this.fetch(
+    const ssoResponse = await this.fetch(
       'skola24-nova-saml-auth',
       alingsasSamlAuthResponseForm.action,
       {
         redirect: 'follow',
         method: 'POST',
-        body: `SAMLResponse=${encodeURIComponent(
-          alingsasSamlAuthResponseForm.samlResponse
+        body: `SAMLRequest=${encodeURIComponent(
+          alingsasSamlAuthResponseForm.samlRequest
         )}&RelayState=${encodeURIComponent(
           alingsasSamlAuthResponseForm.relayState
         )}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          Referer: 'https://idp2.alingsas.se/',
+          Referer: 'https://saml01.alingsas.se/',
           Connection: 'keep-alive',
+          'sec-fetch-dest': 'document',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'same-origin',
+          'upgrade-insecure-requests': '1',
         },
       }
     )
+
+    const ssoText = await ssoResponse.text()
+    const ssoForm = extractSamlAuthResponseForm(ssoText)
+
+    const acsResponse = await this.fetch('skola24-acs', ssoForm.action, {
+      redirect: 'follow',
+      method: 'POST',
+      body: `SAMLResponse=${encodeURIComponent(
+        ssoForm.samlResponse
+      )}&RelayState=${encodeURIComponent(ssoForm.relayState)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+
+    const acsBaseUrl = new URL((acsResponse as any).url).origin
+
+    const acsForm = extractSsoDummyForm(await acsResponse.text())
+
+    const ssoResponse2 = await this.fetch(
+      'skola24-sso2',
+      acsBaseUrl + acsForm.action,
+      {
+        method: 'POST',
+        body: `dummy=${encodeURIComponent(acsForm.dummy)}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Referer: (acsResponse as any).url,
+        },
+      }
+    )
+
+    const ssoForm2 = extractSamlAuthResponseForm(await ssoResponse2.text())
+
+    const ssoNova = await this.fetch('skola24-sso-nova', ssoForm2.action, {
+      method: 'POST',
+      body: `SAMLResponse=${encodeURIComponent(ssoForm2.samlResponse)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+
+    /*
+    const ssoForm2 = extractSamlAuthRequestForm(await ssoResponse2.text())
+
+    const ssoResponse3 = await this.fetch('skola24-sso3', ssoForm2.action, {
+      redirect: 'follow',
+      method: 'POST',
+      body: `SAMLRequest=${encodeURIComponent(
+        ssoForm2.samlRequest
+      )}&RelayState=${encodeURIComponent(ssoForm2.relayState)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    */
+
     this.log('Authenticated')
   }
 

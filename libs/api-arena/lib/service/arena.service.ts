@@ -12,7 +12,7 @@ import {
   toMarkdown,
 } from '@skolplattformen/api'
 import { DummyStatusChecker } from '../dummyStatusChecker'
-import { getBaseUrl } from './common'
+import { extractSsoDummyForm, getBaseUrl } from './common'
 import { IService } from './service.interface'
 import { URL, URLSearchParams } from 'url'
 import { url } from 'inspector'
@@ -199,41 +199,78 @@ export class ArenaService implements IService {
     )
 
     const acsText = await acsResponse.text()
-    const acsDoc = html.parse(decode(acsText))
-    const acsFormAction = acsDoc.querySelector('form').getAttribute('action')!
-    const acsDummy = acsDoc
-      .querySelector('[name="dummy"]')
-      .getAttribute('value')!
+    const acsForm = extractSsoDummyForm(acsText)
 
     const acsBaseUrl = new URL((acsResponse as any).url).origin
 
     const ssoResponse = await this.fetch(
       'arena-sso',
-      acsBaseUrl + acsFormAction,
+      acsBaseUrl + acsForm.action,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `dummy=${encodeURIComponent(acsDummy)}`,
+        body: `dummy=${encodeURIComponent(acsForm.dummy)}`,
       }
     )
 
     const ssoText = await ssoResponse.text()
     const ssoDoc = html.parse(decode(ssoText))
-    const ssoFormAction = ssoDoc.querySelector('form').getAttribute('action')
+    const ssoFormAction = ssoDoc.querySelector('form').getAttribute('action')!
     const ssoSamlResponse = ssoDoc
       .querySelector('[name="SAMLResponse"]')
-      .getAttribute('value')
+      .getAttribute('value')!
     const ssoRelayState = ssoDoc
       .querySelector('[name="RelayState"]')
-      .getAttribute('value')
+      .getAttribute('value')!
 
-    //const authLoginBody = await this.getSigntureAuthBody(signatureUrl)
-    /*
-    const samlLoginBody = await this.getSamlLoginBody(authLoginBody)
-    await this.samlLogin(samlLoginBody)
-    */
+    const acsSecondResponse = await this.fetch(
+      'arena-acs-second',
+      ssoFormAction,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'sec-fetch-dest': 'document',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'same-origin',
+          'upgrade-insecure-requests': '1',
+          Referer: acsBaseUrl + '/',
+        },
+        body: `SAMLResponse=${encodeURIComponent(
+          ssoSamlResponse
+        )}&RelayState=${encodeURIComponent(ssoRelayState)}`,
+      }
+    )
+
+    const acsSecondText = await acsSecondResponse.text()
+    const acsSecondDoc = html.parse(decode(acsSecondText))
+    const acsSecondFormAction = acsSecondDoc
+      .querySelector('form')
+      .getAttribute('action')!
+    const acsSecondSamlResponse = acsSecondDoc
+      .querySelector('[name="SAMLResponse"]')
+      .getAttribute('value')!
+    const acsSecondRelayState = acsSecondDoc
+      .querySelector('[name="RelayState"]')
+      .getAttribute('value')!
+
+    const arenaSamlResponse = await this.fetch(
+      'arena-saml2',
+      acsSecondFormAction,
+      {
+        redirect: 'follow',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `SAMLResponse=${encodeURIComponent(
+          acsSecondSamlResponse
+        )}&RelayState=${encodeURIComponent(acsSecondRelayState)}`,
+      }
+    )
   }
 
   async getUser() {

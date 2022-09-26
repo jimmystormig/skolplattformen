@@ -65,17 +65,15 @@ async function run() {
         )
       }
 
-      /*
       console.log('user') //-
       const user = await api.getUser()
       console.log(user)
-      */
 
+      /*
       console.log('children')
       const children = await api.getChildren()
       console.log(children)
 
-      /*
       console.log('calendar')
       const calendar = await api.getCalendar(children[0])
       console.log(calendar)
