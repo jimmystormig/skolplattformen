@@ -42,9 +42,14 @@ export class ApiArena extends EventEmitter implements Api {
     super()
     this.originalFetcher = wrap(fetch, options)
     this.cookieManager = cookieManager
-    this.arenaService = new ArenaService(this.originalFetcher, this.log)
     this.skola24Service = new Skola24Service(this.originalFetcher, this.log)
     this.unikumService = new UnikumService(this.originalFetcher, this.log)
+    this.arenaService = new ArenaService(
+      this.originalFetcher,
+      this.log,
+      this.skola24Service,
+      this.unikumService
+    )
     this.sodexoService = new SodexoService(this.originalFetcher, this.log)
     this.alingsasService = new AlingsasService(this.originalFetcher, this.log)
   }
@@ -64,10 +69,10 @@ export class ApiArena extends EventEmitter implements Api {
     status.on('OK', async () => {
       this.isLoggedIn = true
       this.personalNumber = personalNumber
-      await Promise.all([
-        this.skola24Service.authenticate(),
-        //this.unikumService.authenticate(),
-      ])
+      //await Promise.all([
+      //await this.skola24Service.authenticate()
+      //await this.unikumService.authenticate()
+      //])
       this.emit('login')
     })
     status.on('ERROR', () => {
@@ -85,10 +90,10 @@ export class ApiArena extends EventEmitter implements Api {
 
     await this.arenaService.authenticate()
 
-    await Promise.all([
-      this.skola24Service.authenticate(),
-      this.unikumService.authenticate(),
-    ])
+    //await Promise.all([
+    //await this.skola24Service.authenticate()
+    //await this.unikumService.authenticate()
+    //])
 
     this.isLoggedIn = true
     this.emit('login')
@@ -101,12 +106,20 @@ export class ApiArena extends EventEmitter implements Api {
   }
 
   async getUser() {
+    const skola24IsAuthenticated = await this.skola24Service.isAuthenticated()
+    const unikumIsAuthenticated = await this.unikumService.isAuthenticated()
+    /*
     const areAllAuthenticated = await Promise.all([
       this.skola24Service.isAuthenticated(),
       this.unikumService.isAuthenticated(),
     ])
 
     if (!areAllAuthenticated[0] || !areAllAuthenticated[1]) {
+      return { isAuthenticated: false } as User
+    }
+    */
+
+    if (!skola24IsAuthenticated || !unikumIsAuthenticated) {
       return { isAuthenticated: false } as User
     }
 

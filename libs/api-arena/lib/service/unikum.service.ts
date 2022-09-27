@@ -6,7 +6,12 @@ import {
   Notification,
   Response,
 } from '@skolplattformen/api'
-import { extractSamlAuthResponseForm, getBaseUrl } from './common'
+import {
+  extractSamlAuthRequestForm,
+  extractSamlAuthResponseForm,
+  extractSsoDummyForm,
+  getBaseUrl,
+} from './common'
 import { IService } from './service.interface'
 
 export class UnikumService implements IService {
@@ -37,8 +42,77 @@ export class UnikumService implements IService {
 
   async authenticate(): Promise<void> {
     this.log('Authenticating...')
-    const unikumResponse = await this.fetch('unikum', this.routes.unikumSso)
+    let fedResponse
 
+    try {
+      fedResponse = await this.fetch('unikum-fed', this.routes.unikumSso)
+    } catch (error) {
+      this.log('error', error)
+      return
+    }
+
+    const fedForm = extractSamlAuthRequestForm(await fedResponse.text())
+
+    const ssoResponse = await this.fetch('unikum-sso', fedForm.action, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `SAMLRequest=${encodeURIComponent(
+        fedForm.samlRequest
+      )}&RelayState=${encodeURIComponent(fedForm.relayState)}`,
+    })
+    const ssoForm = extractSamlAuthRequestForm(await ssoResponse.text())
+    const ssoBaseUrl = getBaseUrl((ssoResponse as any).url)
+
+    const sso2Response = await this.fetch('unikum-sso2', ssoForm.action, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Referer: ssoBaseUrl + '/',
+      },
+      body: `SAMLRequest=${encodeURIComponent(
+        ssoForm.samlRequest
+      )}&RelayState=${encodeURIComponent(ssoForm.relayState)}`,
+    })
+    const sso2Form = extractSamlAuthResponseForm(await sso2Response.text())
+
+    const acsResponse = await this.fetch('unikum-acs', sso2Form.action, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `SAMLResponse=${encodeURIComponent(
+        sso2Form.samlResponse
+      )}&RelayState=${encodeURIComponent(sso2Form.relayState)}`,
+    })
+    const acsForm = extractSsoDummyForm(await acsResponse.text())
+    const acsBaseUrl = getBaseUrl((acsResponse as any).url)
+
+    const sso3Response = await this.fetch(
+      'unikum-sso3',
+      acsBaseUrl + acsForm.action,
+      {
+        method: 'POST',
+        redirect: 'follow',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Referer: (acsResponse as any).url,
+        },
+        body: `dummy=${encodeURIComponent(acsForm.dummy)}`,
+      }
+    )
+    const sso3Form = extractSamlAuthResponseForm(await sso3Response.text())
+
+    await this.fetch('unikum-start', sso3Form.action, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `SAMLResponse=${encodeURIComponent(
+        sso3Form.samlResponse
+      )}&RelayState=${encodeURIComponent(sso3Form.relayState)}`,
+    })
+
+    /*
     if (!UnikumService.isAuthenticated(unikumResponse)) {
       return
     }
@@ -53,6 +127,7 @@ export class UnikumService implements IService {
         samlForm.samlResponse
       )}&RelayState=${encodeURIComponent(samlForm.relayState)}`,
     })
+    */
     this.log('Authenticated')
   }
 
@@ -63,6 +138,9 @@ export class UnikumService implements IService {
       this.routes.unikumStart
     )
     if (!UnikumService.isAuthenticated(unikumStartResponse)) {
+      this.log('Not authenticated')
+      return false
+      /*
       this.log('Not authenticated, trying to reauthenticate')
       await this.authenticate()
       unikumStartResponse = await this.fetch(
@@ -73,6 +151,7 @@ export class UnikumService implements IService {
         this.log('Still not authenticated, giving up')
         return false
       }
+      */
     }
     this.log('Authenticated')
     return true

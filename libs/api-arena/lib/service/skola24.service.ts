@@ -11,6 +11,7 @@ import {
   extractSamlAuthRequestForm,
   extractSamlAuthResponseForm,
   extractSsoDummyForm,
+  getBaseUrl,
 } from './common'
 import { IService } from './service.interface'
 export class Skola24Service implements IService {
@@ -18,6 +19,7 @@ export class Skola24Service implements IService {
 
   private fetch: Fetcher
   private routes = {
+    arena: 'https://arena.alingsas.se',
     skola24: 'http://saml01.alingsas.se/skolfed/skola24',
     skola24Timetables:
       'https://web.skola24.se/api/services/skola24/get/personal/timetables',
@@ -42,72 +44,88 @@ export class Skola24Service implements IService {
 
   async authenticate() {
     this.log('Authenticating...')
-    const skola24Response = await this.fetch(
-      'skola24-start',
-      this.routes.skola24,
-      {
+
+    let skola24Response
+    try {
+      skola24Response = await this.fetch('skola24-start', this.routes.skola24, {
         redirect: 'follow',
-      }
-    )
-
-    const skola24ResponseText = await skola24Response.text()
-    const skola24ResponseDoc = html.parse(decode(skola24ResponseText))
-    const ssoLoginUrl = skola24ResponseDoc
-      .querySelector('iframe')
-      .getAttribute('src')
-    /*
-    const ssoLoginUrl = await Skola24Service.extractFrameSource(
-      skola24ResponseText
-    )
-    */
-
-    const skola24LoginResponse = await this.fetch(
-      'skola24-login',
-      (skola24Response as any).url + ssoLoginUrl
-    )
-    const skola24LoginResponseText = await skola24LoginResponse.text()
-    const skola24LoginNovaSsoUrl = Skola24Service.extractLoginNovaSsoUrl(
-      skola24LoginResponseText
-    )
-
-    const skola24LoginNovaSsoResponse = await this.fetch(
-      'skola24-login-nova-sso',
-      skola24LoginNovaSsoUrl as string
-    )
-
-    const skola24LoginNovaSsoResponseText =
-      await skola24LoginNovaSsoResponse.text()
-    const alingsasSamlAuthForm =
-      Skola24Service.extractAlingsasSamlAuthRequestForm(
-        skola24LoginNovaSsoResponseText
-      )
-    const alingsasSamlAuthRequestResponse = await this.fetch(
-      'skola24-alingsas-saml-auth',
-      alingsasSamlAuthForm.action,
-      {
-        redirect: 'follow',
-        method: 'POST',
-        body:
-          'SAMLRequest=' + encodeURIComponent(alingsasSamlAuthForm.samlRequest),
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Referer: 'https://service-sso1.novasoftware.se/',
           Connection: 'keep-alive',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': 1,
         },
-      }
-    )
-
-    /*
-    if (!Skola24Service.isAuthenticated(alingsasSamlAuthRequestResponse)) {
+      })
+    } catch (error) {
+      this.log('error', error)
       return
     }
-    */
 
-    const alingsasSamlAuthRequestResponseText =
-      await alingsasSamlAuthRequestResponse.text()
-    const alingsasSamlAuthResponseForm = extractSamlAuthRequestForm(
-      alingsasSamlAuthRequestResponseText
-    )
+    let skola24ResponseText = await skola24Response.text()
+
+    const skola24ResponseDoc = html.parse(decode(skola24ResponseText))
+
+    const iFrame = skola24ResponseDoc.querySelector('iframe')
+
+    if (iFrame) {
+      const ssoLoginUrl = iFrame.getAttribute('src')
+      /*
+const ssoLoginUrl = await Skola24Service.extractFrameSource(
+  skola24ResponseText
+)
+*/
+
+      const skola24LoginResponse = await this.fetch(
+        'skola24-login',
+        (skola24Response as any).url + ssoLoginUrl
+      )
+      const skola24LoginResponseText = await skola24LoginResponse.text()
+      const skola24LoginNovaSsoUrl = Skola24Service.extractLoginNovaSsoUrl(
+        skola24LoginResponseText
+      )
+
+      const skola24LoginNovaSsoResponse = await this.fetch(
+        'skola24-login-nova-sso',
+        skola24LoginNovaSsoUrl as string
+      )
+
+      const skola24LoginNovaSsoResponseText =
+        await skola24LoginNovaSsoResponse.text()
+      const alingsasSamlAuthForm =
+        Skola24Service.extractAlingsasSamlAuthRequestForm(
+          skola24LoginNovaSsoResponseText
+        )
+      const alingsasSamlAuthRequestResponse = await this.fetch(
+        'skola24-alingsas-saml-auth',
+        alingsasSamlAuthForm.action,
+        {
+          redirect: 'follow',
+          method: 'POST',
+          body:
+            'SAMLRequest=' +
+            encodeURIComponent(alingsasSamlAuthForm.samlRequest),
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Referer: 'https://service-sso1.novasoftware.se/',
+            Connection: 'keep-alive',
+          },
+        }
+      )
+
+      /*
+if (!Skola24Service.isAuthenticated(alingsasSamlAuthRequestResponse)) {
+  return
+}
+*/
+
+      skola24ResponseText = await alingsasSamlAuthRequestResponse.text()
+    }
+
+    const alingsasSamlAuthResponseForm =
+      extractSamlAuthRequestForm(skola24ResponseText)
+
     const ssoResponse = await this.fetch(
       'skola24-nova-saml-auth',
       alingsasSamlAuthResponseForm.action,
@@ -132,6 +150,7 @@ export class Skola24Service implements IService {
     )
 
     const ssoText = await ssoResponse.text()
+
     const ssoForm = extractSamlAuthResponseForm(ssoText)
 
     const acsResponse = await this.fetch('skola24-acs', ssoForm.action, {
@@ -145,9 +164,16 @@ export class Skola24Service implements IService {
       },
     })
 
-    const acsBaseUrl = new URL((acsResponse as any).url).origin
+    if ((acsResponse as any).url.indexOf(this.routes.arena) > -1) {
+      this.log('Authenticated')
+      return
+    }
 
-    const acsForm = extractSsoDummyForm(await acsResponse.text())
+    const acsText = await acsResponse.text()
+
+    const acsBaseUrl = getBaseUrl((acsResponse as any).url)
+
+    const acsForm = extractSsoDummyForm(acsText)
 
     const ssoResponse2 = await this.fetch(
       'skola24-sso2',
@@ -194,6 +220,9 @@ export class Skola24Service implements IService {
     this.log('isAuthenticated?')
     let children = await this.getChildren()
     if (!children || children.length === 0) {
+      this.log('Not authenticated')
+      return false
+      /*
       this.log('Not authenticated, trying to reauthenticate')
       await this.authenticate()
       children = await this.getChildren()
@@ -201,6 +230,7 @@ export class Skola24Service implements IService {
         this.log('Still not authenticated, giving up')
         return false
       }
+      */
     }
     this.log('Authenticated')
     return true

@@ -14,8 +14,8 @@ import {
 import { DummyStatusChecker } from '../dummyStatusChecker'
 import { extractSsoDummyForm, getBaseUrl } from './common'
 import { IService } from './service.interface'
-import { URL, URLSearchParams } from 'url'
-import { url } from 'inspector'
+import { Skola24Service } from './skola24.service'
+import { UnikumService } from './unikum.service'
 
 enum PolicyRole {
   Caregiver = 5,
@@ -34,6 +34,8 @@ export class ArenaService implements IService {
   static arenaStart = 'https://arena.alingsas.se'
   log: (...data: any[]) => void = () => {}
   private fetch: Fetcher
+  private skola24Service: Skola24Service
+  private unikumService: UnikumService
   private routes = {
     bankIdLandingPage: (baseUrl: string) =>
       baseUrl + '/wa/auth?authmech=tc6wyb5ukmps',
@@ -49,9 +51,16 @@ export class ArenaService implements IService {
     arenaNews: (newsPath: string) => `${ArenaService.arenaStart}${newsPath}`,
   }
 
-  constructor(fetch: Fetcher, log: (...data: any[]) => void) {
+  constructor(
+    fetch: Fetcher,
+    log: (...data: any[]) => void,
+    skola24: Skola24Service,
+    unikum: UnikumService
+  ) {
     this.fetch = fetch
     this.log = (...data) => log('[arena-service]', ...data)
+    this.skola24Service = skola24
+    this.unikumService = unikum
   }
 
   setFetcher(fetcher: Fetcher): void {
@@ -73,7 +82,9 @@ export class ArenaService implements IService {
       startpageResponseText,
       PolicyRole.Caregiver,
       PolicyMethod.BankId,
-      PolicyBankIdMode.OnOtherDevice
+      personalNumber
+        ? PolicyBankIdMode.OnOtherDevice
+        : PolicyBankIdMode.OnThisDevice
     )
 
     // const authTicket = await this.generateAuthTicket('test', personalNumber)
@@ -91,24 +102,14 @@ export class ArenaService implements IService {
       }
     )
 
-    const parsedLoginPolicyAuthenticateUrl = new URL(loginPolicyAuthenticateUrl)
     const loginPolicyAuthenticateBaseUrl =
-      parsedLoginPolicyAuthenticateUrl.href.split('?')[0]
-    const loginPolicyAuthenticatePollUrl =
-      loginPolicyAuthenticateBaseUrl +
-      '?' +
-      new URLSearchParams({
-        sessionid:
-          parsedLoginPolicyAuthenticateUrl.searchParams.get('sessionid')!,
-        collect: '1',
-      })
-    const loginPolicyAuthenticateLoginUrl =
-      loginPolicyAuthenticateBaseUrl +
-      '?' +
-      new URLSearchParams({
-        sessionid:
-          parsedLoginPolicyAuthenticateUrl.searchParams.get('sessionid')!,
-      })
+      loginPolicyAuthenticateUrl.split('?')[0]
+
+    const loginPolicyAuthenticateSessionId =
+      loginPolicyAuthenticateUrl.match(/(sessionid=.*?)&/)![1]
+
+    const loginPolicyAuthenticatePollUrl = `${loginPolicyAuthenticateBaseUrl}?${loginPolicyAuthenticateSessionId}&collect=1`
+    const loginPolicyAuthenticateLoginUrl = `${loginPolicyAuthenticateBaseUrl}?${loginPolicyAuthenticateSessionId}`
 
     const status = new ArenaStatusChecker(
       this,
@@ -201,7 +202,7 @@ export class ArenaService implements IService {
     const acsText = await acsResponse.text()
     const acsForm = extractSsoDummyForm(acsText)
 
-    const acsBaseUrl = new URL((acsResponse as any).url).origin
+    const acsBaseUrl = getBaseUrl((acsResponse as any).url)
 
     const ssoResponse = await this.fetch(
       'arena-sso',
@@ -257,20 +258,19 @@ export class ArenaService implements IService {
       .querySelector('[name="RelayState"]')
       .getAttribute('value')!
 
-    const arenaSamlResponse = await this.fetch(
-      'arena-saml2',
-      acsSecondFormAction,
-      {
-        redirect: 'follow',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `SAMLResponse=${encodeURIComponent(
-          acsSecondSamlResponse
-        )}&RelayState=${encodeURIComponent(acsSecondRelayState)}`,
-      }
-    )
+    await this.fetch('arena-saml2', acsSecondFormAction, {
+      redirect: 'follow',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `SAMLResponse=${encodeURIComponent(
+        acsSecondSamlResponse
+      )}&RelayState=${encodeURIComponent(acsSecondRelayState)}`,
+    })
+
+    await this.skola24Service.authenticate()
+    await this.unikumService.authenticate()
   }
 
   async getUser() {
@@ -299,7 +299,6 @@ export class ArenaService implements IService {
       '.field-name-field-user-email .field-item'
     ).rawText
 
-    this.log('Authenticated')
     return {
       isAuthenticated: true,
       firstName: firstName,
@@ -721,6 +720,7 @@ export class ArenaStatusChecker
   }
 
   async check(): Promise<void> {
+    console.log('ArenaStatusChecker check')
     const pollStatus = await this.arenaService.getPollStatus(
       this.pollUrl,
       this.loginUrl
